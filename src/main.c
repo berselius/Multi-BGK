@@ -1080,6 +1080,9 @@ int main(int argc, char **argv) {
       if (rank == 0) {
         rankOffset = 0;
 
+        for (l = 0; l < Nx; l++)
+          printf("l PoisPot %g\n", PoisPot_allranks[l]);
+
         // SET LOCAL GHOST CELLS
         if (order == 1) {
           PoisPot[0] = PoisPot_allranks[Nx - 1];
