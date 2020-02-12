@@ -54,7 +54,6 @@ void initialize_global_poisson(int Nx_, double dx_, double Lx_, int *Nx_ranks_,
   *PoisPot_allranks = malloc(Nx * sizeof(double));
   *source_allranks = malloc(Nx * sizeof(double));
   *Te_arr_allranks = malloc(Nx * sizeof(double));
-
 }
 
 // All ranks
@@ -100,7 +99,6 @@ void gather_charge_sources(double *source, double *Te, double *source_allranks,
       rankOffset += Nx_ranks[rankCounter];
     }
   }
-
 }
 
 // Rank > 0 function
