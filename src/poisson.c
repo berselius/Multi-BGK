@@ -13,7 +13,7 @@ static int poissonFlavor;
 static int order;
 static int *Nx_ranks;
 
-static MPI_STATUS status;
+static MPI_Status status;
 
 static double *source_buf;
 
@@ -71,7 +71,7 @@ void calculate_local_charge_source(double **n, double **Z, double *source) {
 void gather_charge_sources(double *source, double *Te, double *source_allranks,
                            double *Te_allranks) {
 
-  int i, l;
+  int l;
   int rankOffset;
   int rankCounter;
 
@@ -115,21 +115,23 @@ void send_charge_sources(double *source, double *Te) {
 void poisson_solve(double *source_allranks, double *Te_allranks,
                    double *PoisPot_allranks) {
 
-  if (poissFlavor == 0) { // no E-field
+  int l;
+
+  if (poissonFlavor == 0) { // no E-field
     for (l = 0; l < Nx; l++)
       PoisPot_allranks[l] = 0.0;
-  } else if (poissFlavor == 11) // Linear Yukawa
+  } else if (poissonFlavor == 11) // Linear Yukawa
     PoissLinPeriodic1D(Nx, source_allranks, dx, Lx, PoisPot_allranks,
-                       Te_arr_allranks);
-  else if (poissFlavor == 12) // Nonlinear Yukawa
+                       Te_allranks);
+  else if (poissonFlavor == 12) // Nonlinear Yukawa
     PoissNonlinPeriodic1D(Nx, source_allranks, dx, Lx, PoisPot_allranks,
-                          Te_arr_allranks);
-  else if (poissFlavor == 21) // Linear Thomas-Fermi
+                          Te_allranks);
+  else if (poissonFlavor == 21) // Linear Thomas-Fermi
     PoissLinPeriodic1D_TF(Nx, source_allranks, dx, Lx, PoisPot_allranks,
-                          Te_arr_allranks);
-  else if (poissFlavor == 22) // Nonlinear Thomas-Fermi
+                          Te_allranks);
+  else if (poissonFlavor == 22) // Nonlinear Thomas-Fermi
     PoissNonlinPeriodic1D_TF(Nx, source_allranks, dx, Lx, PoisPot_allranks,
-                             Te_arr_allranks);
+                             Te_allranks);
   else {
     printf("ERROR: Please set your poisson solver option to 0, 11, 12, 21, or "
            "22\n");

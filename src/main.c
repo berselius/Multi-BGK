@@ -24,6 +24,7 @@
 
 // Vlasov/LHS packages
 #include "mesh.h"
+#include "poisson.h"
 #include "poissonNonlinPeriodic.h"
 #include "transportroutines.h"
 
@@ -39,7 +40,6 @@ int main(int argc, char **argv) {
   MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
   MPI_Status status;
   int rankCounter;
-  int rankOffset;
   double *momentBuffer;
   int *Nx_ranks;
 
@@ -536,11 +536,12 @@ int main(int argc, char **argv) {
     }
 
     // Allocate for poisson calc
-    initialize_local_poisson(Nx_rank, order, PoisPot, source, Te_arr);
+    initialize_local_poisson(nspec, Nx_rank, order, &PoisPot, &source, &Te_arr);
 
     if (rank == 0) {
-      initialize_global_poisson(Nx, PoisPot_allranks, source_allranks,
-                                Te_arr_allranks);
+      initialize_global_poisson(Nx, dx, Lx, Nx_ranks, poissFlavor,
+                                &PoisPot_allranks, &source_allranks,
+                                &Te_arr_allranks);
     }
 
     T_for_zbar = malloc(Nx_rank * sizeof(double));
@@ -1004,7 +1005,7 @@ int main(int argc, char **argv) {
           Z_oned[l] = Z_max;
       }
 
-      calculate_local_charge_source(Nx_rank, n_oned, Z_oned, source);
+      calculate_local_charge_source(n_oned, Z_oned, source);
 
       // Set up the source/RHS array for the Poisson solve
 
@@ -1194,7 +1195,7 @@ int main(int argc, char **argv) {
             Z_oned[l] = Z_max;
         }
 
-        calculate_local_charge_source(Nx_rank, n_oned, Z_oned, source);
+        calculate_local_charge_source(n_oned, Z_oned, source);
 
         // Set up the source/RHS array for the Poisson solve
 
@@ -1354,7 +1355,7 @@ int main(int argc, char **argv) {
             Z_oned[l] = Z_max;
         }
 
-        calculate_local_charge_source(Nx_rank, n_oned, Z_oned, source);
+        calculate_local_charge_source(n_oned, Z_oned, source);
 
         // Set up the source/RHS array for the Poisson solve
 
@@ -1417,7 +1418,7 @@ int main(int argc, char **argv) {
             Z_oned[l] = Z_max;
         }
 
-        calculate_local_charge_source(Nx_rank, n_oned, Z_oned, source);
+        calculate_local_charge_source(n_oned, Z_oned, source);
 
         // Set up the source/RHS array for the Poisson solve
 
