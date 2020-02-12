@@ -1019,13 +1019,8 @@ int main(int argc, char **argv) {
       MPI_Barrier(MPI_COMM_WORLD);
 
       if (rank == 0) { // Rank 0 performs the Poisson Solve
-        poisson_solve(source_allranks, Te_arr_allranks, PoisPot_allranks);
-      }
-
-      // Distribute back to the other ranks
-      if (rank == 0) {
-        send_poisson_potential(PoisPot_allranks, PoisPot);
-
+        poisson_solve(source_allranks, Te_arr_allranks, PoisPot_allranks);     
+        send_poisson_potential(PoisPot_allranks, PoisPot);        
       } else {
         // Get potential from rank 0
         recieve_poisson_potentials(PoisPot);

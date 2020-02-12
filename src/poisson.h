@@ -9,7 +9,7 @@ void initialize_local_poisson(int nspec_, int Nx_rank_, int order_,
 
 // The global ctor for poisson routines
 // Call from Rank 0
-void initialize_global_poisson(int Nx_, int dx_, int Lx_, int *Nx_ranks_,
+void initialize_global_poisson(int Nx_, double dx_, double Lx_, int *Nx_ranks_,
                                int poissonFlavor_, double **PoisPot_allranks,
                                double **source_allranks,
                                double **Te_arr_allranks);

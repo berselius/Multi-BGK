@@ -8,7 +8,8 @@ static int rank;
 static int numRanks;
 static int nspec;
 static int Nx_rank;
-static int Nx, dx, Lx;
+static int Nx;
+static double dx, Lx;
 static int poissonFlavor;
 static int order;
 static int *Nx_ranks;
@@ -37,7 +38,7 @@ void initialize_local_poisson(int nspec_, int Nx_rank_, int order_,
 }
 
 // Rank 0 function
-void initialize_global_poisson(int Nx_, int dx_, int Lx_, int *Nx_ranks_,
+void initialize_global_poisson(int Nx_, double dx_, double Lx_, int *Nx_ranks_,
                                int poissonFlavor_, double **PoisPot_allranks,
                                double **source_allranks,
                                double **Te_arr_allranks) {
@@ -53,6 +54,7 @@ void initialize_global_poisson(int Nx_, int dx_, int Lx_, int *Nx_ranks_,
   *PoisPot_allranks = malloc(Nx * sizeof(double));
   *source_allranks = malloc(Nx * sizeof(double));
   *Te_arr_allranks = malloc(Nx * sizeof(double));
+
 }
 
 // All ranks
@@ -98,6 +100,7 @@ void gather_charge_sources(double *source, double *Te, double *source_allranks,
       rankOffset += Nx_ranks[rankCounter];
     }
   }
+
 }
 
 // Rank > 0 function
