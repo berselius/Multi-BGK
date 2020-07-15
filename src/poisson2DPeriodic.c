@@ -5,6 +5,8 @@
 #include "poisson2DPeriodic.h"
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_linalg.h>
+#include <gsl/gsl_matrix.h>
+#include <gsl/gsl_vector.h>
 
 static unsigned Nx, Ny;
 static double dx, dy;
@@ -44,17 +46,17 @@ void GaussSeidel(gsl_matrix *A, gsl_vector *b, gsl_vector *sol) {
   double residual;
 
   // initialize phi
-  gsl_vector_dcopy(sol, xold);
+  gsl_blas_dcopy(sol, xold);
 
   // Fill the matrices
   for (i = 0; i < Nx * Ny; i++) {
     for (j = 0; j < i; j++)
-      gsl_matrix_set(L, i, j) = gsl_matrix_get(A, i, j);
+      gsl_matrix_set(L, i, j, gsl_matrix_get(A, i, j));
     for (j = i; j < Nx * Ny; j++)
-      gsl_matrix_set(U, i, j) = gsl_matrix_get(A, i, j);
+      gsl_matrix_set(U, i, j, gsl_matrix_get(A, i, j));
   }
 
-  for (iter = 0; iter < maxiters; ++iter) {
+  for (iter = 0; iter < maxiter; ++iter) {
 
     // compute new RHS
     // RHS = b - Lx_old
@@ -77,13 +79,13 @@ void GaussSeidel(gsl_matrix *A, gsl_vector *b, gsl_vector *sol) {
     if (residual < abstol)
       break;
 
-    gsl_vector_dswap(xold, xnew);
+    gsl_blas_dswap(xold, xnew);
   }
 
   printf("Number of iterations %d\n", iter);
   printf("Residual %le\n", residual);
 
-  gsl_vector_dcopy(xnew, sol);
+  gsl_blas_dcopy(xnew, sol);
 
   gsl_matrix_free(L);
   gsl_matrix_free(U);
