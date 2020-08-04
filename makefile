@@ -9,7 +9,7 @@ CC=mpicc
 
 # Compiler flags
 CFLAGS= -O0 -fopenmp -Wall
-LIBFLAGS = -lm -lgsl -lgslcblas
+LIBFLAGS = -lm -lgsl -lgslcblas -lfftw3
 
 # Command definition
 RM=rm -f
@@ -17,7 +17,7 @@ RM=rm -f
 # sources for main
 sources_main = $(SRCDIR)main.c
 
-objects_main = BGK.o momentRoutines.o transportroutines.o poissonNonlinPeriodic.o gauss_legendre.o input.o io.o zBar.o initialize_sol.o mesh.o implicit.o TNB.o
+objects_main = BGK.o momentRoutines.o transportroutines.o poissonNonlinPeriodic.o gauss_legendre.o input.o io.o zBar.o initialize_sol.o mesh.o implicit.o TNB.o fourier.o
 
 pref_main_objects = $(addprefix $(OBJDIR), $(objects_main))
 
