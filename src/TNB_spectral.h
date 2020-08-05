@@ -3,7 +3,7 @@
 
 // Initializer
 
-void initializeTNB_s(int Nv_in, double **c_in, double **wts_in);
+void initializeTNB(int Nv_in, double **c_in, double **wts_in);
 
 //-----------------------------------------//
 
