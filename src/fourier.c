@@ -6,7 +6,7 @@
 
 static int N; // number of fourier modes, number of 1d grid points
 
-static double *k; // Fourier grid info
+static double *k_arr; // Fourier grid info
 static double Lk;
 static double dk;
 
@@ -34,17 +34,17 @@ void initialize_fourier(int modes, double *vel) {
   Lv = -vel[0];
   dv = vel[1] - vel[0];
 
-  k = (double *)malloc(N * sizeof(double));
+  k_arr = (double *)malloc(N * sizeof(double));
 
   dk = 2 * M_PI * N / dv;
   Lk = 0.5 * (N - 1) * dk;
   for (int i = 0; i < N; i++) {
-    k[i] = -Lk + i * dk;
+    k_arr[i] = -Lk + i * dk;
   }
 
   wtN = malloc(N * sizeof(double));
   wtN[0] = 0.5;
-  for (i = 1; i < (N - 1); i++) {
+  for (int i = 1; i < (N - 1); i++) {
     wtN[i] = 1.0;
   }
   wtN[N - 1] = 0.5;
@@ -67,16 +67,20 @@ void fft3D(fftw_complex *in, fftw_complex *out, int invert) {
     delta = dv;
     L_start = Lk;
     L_end = Lv;
-    varr = k;
+    varr = k_arr;
     sign = 1.0;
     p = p_forward;
-  } else {
+  } else if (invert == inverse) {
     delta = dk;
     L_start = Lv;
     L_end = Lk;
     varr = v;
     sign = -1.0;
     p = p_backward;
+  } else {
+    printf(
+        "Something weird happened in how a fourier transform was specified\n");
+    exit(37);
   }
   prefactor = scale3 * delta * delta * delta;
 

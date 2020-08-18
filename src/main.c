@@ -588,7 +588,7 @@ int main(int argc, char **argv) {
 
     // Check to see if we need to fix some velocity grids
     double TNB_min_mass = 1e37;
-    if (TNBflag) {
+    if (TNBFlag) {
       // Check if isTNB was set
       if (!isTNB) {
         printf("TNB is set to on, but TNB status of the species is not set. "
