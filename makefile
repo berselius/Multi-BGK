@@ -17,7 +17,7 @@ RM=rm -f
 # sources for main
 sources_main = $(SRCDIR)main.c
 
-objects_main = BGK.o momentRoutines.o transportroutines.o poissonNonlinPeriodic.o gauss_legendre.o input.o io.o zBar.o initialize_sol.o mesh.o implicit.o TNB.o fourier.o
+objects_main = BGK.o momentRoutines.o transportroutines.o poissonNonlinPeriodic.o gauss_legendre.o input.o io.o zBar.o initialize_sol.o mesh.o implicit.o TNB_spectral.o fourier.o gauss_legendre.o
 
 pref_main_objects = $(addprefix $(OBJDIR), $(objects_main))
 
@@ -36,13 +36,6 @@ postProc: $(sources_postproc)
 all: MultiBGK postProc
 
 $(OBJDIR)%.o : $(SRCDIR)%.c
-	@echo "Compiling  $< ... " ; \
-	if [ -f  $@ ] ; then \
-		rm $@ ;\
-	fi ; \
-	$(CC)  -c $(CFLAGS)  $< -o $@ 2>&1 ;
-
-$(OBJDIR)TNB.o : $(SRCDIR)TNB.c
 	@echo "Compiling  $< ... " ; \
 	if [ -f  $@ ] ; then \
 		rm $@ ;\

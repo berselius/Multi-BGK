@@ -1,9 +1,11 @@
 #include "fourier.h"
+#include "gauss_legendre.h"
 #include "units/unit_data.c"
 #include <math.h>
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #ifndef EPS_COLL
 #define EPS_COLL 1e6
@@ -35,7 +37,7 @@ struct TNB_data {
 
   double mabs; // extra data member tacked on for use in integrator
 
-  char[16] name;
+  char name[16];
 };
 
 void initializeTNB(int Nv_in, double **c_in, double **wts_in) {
@@ -46,13 +48,14 @@ void initializeTNB(int Nv_in, double **c_in, double **wts_in) {
 }
 
 // forward declaration
-void generate_conv_weights(double *conv_weights, TNB_data *reaction_info);
+void generate_conv_weights(double *conv_weights,
+                           struct TNB_data *reaction_info);
 
 // Generic TNB calculator
 // This takes input data for the various flavors of TNB reactions
 // Computes Q_TNB(c) = \int |g| \sigma(|g|) f_1(c) f_2(c_\ast) d\c_ast
-void TNB_generic(TNB_data *reaction_info, double mu, double *f1, double *f2,
-                 int sp, int sp2, double *Q_TNB) {
+void TNB_generic(struct TNB_data *reaction_info, double mu, double *f1,
+                 double *f2, int sp, int sp2, double *Q_TNB) {
 
   // Initialize Q_TNB
   for (int i = 0; i < Nv * Nv * Nv; i++) {
@@ -68,14 +71,14 @@ void TNB_generic(TNB_data *reaction_info, double mu, double *f1, double *f2,
   }
 
   // Check to see if the weight is generated
-  char[256] weight_filename = "Data/";
-  char[256] buffer;
+  char weight_filename[256] = "Data/";
+  char buffer[256];
   sprintf(buffer, "TNB_weight_");
   strcat(buffer, reaction_info->name);
   strcat(weight_filename, buffer);
 
   FILE *fidWeights;
-  if (fidWeights = fopen(weight_filename, "r")) {
+  if ((fidWeights = fopen(weight_filename, "r"))) {
     printf("Loading weights from %s\n", weight_filename);
     fread(conv_weights, sizeof(double), Nv * Nv * Nv, fidWeights);
   } else {
@@ -83,7 +86,7 @@ void TNB_generic(TNB_data *reaction_info, double mu, double *f1, double *f2,
     // dump the weights we've computed into a file
 
     fidWeights = fopen(weight_filename, "w");
-    fwrite(conv_weights, sizeof(double), N * N * N, fidWeights);
+    fwrite(conv_weights, sizeof(double), Nv * Nv * Nv, fidWeights);
     if (fflush(fidWeights) != 0) {
       printf("Something is wrong with storing the weights");
       exit(0);
@@ -95,10 +98,10 @@ void TNB_generic(TNB_data *reaction_info, double mu, double *f1, double *f2,
 
 double integrand(double r, void *args) {
 
-  TNB_data *data = (TNB_data *)args;
+  struct TNB_data *data = (struct TNB_data *)args;
 
-  E_COM = 0.5 * data->mu_interaction * r * r * ERG_TO_EV_CGS *
-          1e-3; // Center of mass energy in keV
+  double E_COM = 0.5 * data->mu_reaction * r * r * ERG_TO_EV_CGS *
+                 1e-3; // Center of mass energy in keV
 
   double nuclear_factor_num =
       data->a1 +
@@ -120,10 +123,9 @@ double integrand(double r, void *args) {
 }
 
 // Computes the convolution weights given the cross section parameters
-void generate_conv_weights(double *conv_weights, TNB_data *reaction_info,
-                           int sp1, int sp2) {
+void generate_conv_weights(double *conv_weights,
+                           struct TNB_data *reaction_info) {
 
-  // Need to account for different velocity grids...
   double Lv;
   double spmax;
 

@@ -29,7 +29,8 @@
 
 // BGK/RHS packages
 #include "BGK.h"
-#include "TNB.h"
+// #include "TNB.h"
+#include "TNB_spectral.h"
 
 int main(int argc, char **argv) {
 
