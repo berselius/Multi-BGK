@@ -10,10 +10,11 @@ void read_input(int *nspec, int *dims, int *Nx, double *Lx, int *Nv,
                 int *numint, double **intervalLimits, double **ndens_in,
                 double **velo_in, double **T_in, int *ecouple, int *ionFix,
                 double *Te_start, double *Te_end, int *CL_type, int *ion_type,
-                int *MT_or_TR, int *TNB, double **n, double **u, double **T,
-                int *dataFreq, int *outputDist, double *RHS_tol, int *BGK_type,
-                double *beta, int *hydro_flag, int *input_data_file_flag,
-                char *input_file_data_filename, char *inputFilename);
+                int *MT_or_TR, int *TNB, int **isTNB, double **n, double **u,
+                double **T, int *dataFreq, int *outputDist, double *RHS_tol,
+                int *BGK_type, double *beta, int *hydro_flag,
+                int *input_data_file_flag, char *input_file_data_filename,
+                char *inputFilename);
 
 void set_default_values(int *Nx, double *Lx, int *Nv, double *v_sigma,
                         int *order, int *discret, int *im_ex, int *poissFlavor,

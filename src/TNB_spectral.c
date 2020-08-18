@@ -32,8 +32,8 @@ struct TNB_data {
 
   double mu_reaction; // This is the relative mass for the reaction - used to
                       // check if we have the right species coming in
-  
-  double mabs;        // extra data member tacked on for use in integrator
+
+  double mabs; // extra data member tacked on for use in integrator
 
   char[16] name;
 };
@@ -113,30 +113,27 @@ double integrand(double r, void *args) {
                                    exp(-data->B_G / sqrt(E_COM)) / E_COM
                              : 0;
 
-  double sincval = (r * data->mabs < 1.0e-6) ? 1.0 : sin(r * data->mabs) / (r * data->mabs);
+  double sincval =
+      (r * data->mabs < 1.0e-6) ? 1.0 : sin(r * data->mabs) / (r * data->mabs);
 
-  return pow(r,3.0) * xsec * sincval;
+  return pow(r, 3.0) * xsec * sincval;
 }
 
 // Computes the convolution weights given the cross section parameters
-void generate_conv_weights(double *conv_weights, TNB_data *reaction_info, int sp1, int sp2) {
-  
-  //Need to account for different velocity grids...
+void generate_conv_weights(double *conv_weights, TNB_data *reaction_info,
+                           int sp1, int sp2) {
+
+  // Need to account for different velocity grids...
   double Lv;
   double spmax;
-  
-  
 
-  for(int i = 0; i < Nv; ++i) {
-    for(int j = 0; j < Nv; ++j) {
-      for(int k = 0; k < Nv; ++k) { 
+  for (int i = 0; i < Nv; ++i) {
+    for (int j = 0; j < Nv; ++j) {
+      for (int k = 0; k < Nv; ++k) {
 
-	
-
-	//add gauss legendre
-	double result = gauss_legendre(64, integrand, args, 0, Lv);
+        // add gauss legendre
+        double result = gauss_legendre(64, integrand, args, 0, Lv);
       }
     }
   }
-
 }

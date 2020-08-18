@@ -15,10 +15,11 @@ void read_input(int *nspec, int *dims, int *Nx, double *Lx, int *Nv,
                 int *numint, double **intervalLimits, double **ndens_int,
                 double **velo_int, double **T_int, int *ecouple, int *ionFix,
                 double *Te_start, double *Te_end, int *CL_type, int *ion_type,
-                int *MT_or_TR, int *TNB, double **n, double **u, double **T,
-                int *dataFreq, int *outputDist, double *RHS_tol, int *BGK_type,
-                double *beta, int *hydro_flag, int *input_file_data_flag,
-                char *input_file_data_filename, char *inputFilename) {
+                int *MT_or_TR, int *TNB, int **isTNB, double **n, double **u,
+                double **T, int *dataFreq, int *outputDist, double *RHS_tol,
+                int *BGK_type, double *beta, int *hydro_flag,
+                int *input_file_data_flag, char *input_file_data_filename,
+                char *inputFilename) {
 
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -173,6 +174,19 @@ void read_input(int *nspec, int *dims, int *Nx, double *Lx, int *Nv,
         (*Z)[i] = read_double(input_file);
         if (rank == 0)
           printf("%g\n", (*Z)[i]);
+      }
+    }
+
+    if (strcmp(line, "isTNB") == 0) {
+      if (*nspec == -1) {
+        printf("ERROR: number of species not set\n");
+        exit(37);
+      }
+      *isTNB = malloc((*nspec) * sizeof(double));
+      for (i = 0; i < (*nspec); i++) {
+        (*isTNB)[i] = read_int(input_file);
+        if (rank == 0)
+          printf("%d\n", (*isTNB)[i]);
       }
     }
 

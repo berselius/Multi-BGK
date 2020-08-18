@@ -61,6 +61,9 @@ int main(int argc, char **argv) {
   // species charges
   double **Z_oned, *Z_max, *Z_zerod;
 
+  // species TNB status
+  int *isTNB = 0;
+
   // Flags for BGK collision rates
   int ecouple, CL_type, ion_type, MT_or_TR;
   int BGK_type;
@@ -172,9 +175,9 @@ int main(int argc, char **argv) {
   read_input(&nspec, &dims, &Nx, &Lx, &Nv, &v_sigma, &discret, &poissFlavor, &m,
              &Z_max, &order, &im_ex, &dt, &tfinal, &numint, &intervalLimits,
              &ndens_int, &velo_int, &T_int, &ecouple, &ionFix, &Te_start,
-             &Te_ref, &CL_type, &ion_type, &MT_or_TR, &TNBFlag, &n_zerod,
-             &v_val, &T_zerod, &dataFreq, &outputDist, &RHS_tol, &BGK_type,
-             &beta, &hydro_kinscheme_flag, &input_file_data_flag,
+             &Te_ref, &CL_type, &ion_type, &MT_or_TR, &TNBFlag, &isTNB,
+             &n_zerod, &v_val, &T_zerod, &dataFreq, &outputDist, &RHS_tol,
+             &BGK_type, &beta, &hydro_kinscheme_flag, &input_file_data_flag,
              input_file_data_filename, input_filename);
 
   char output_path[100] = {"./Data/"};
@@ -583,6 +586,27 @@ int main(int argc, char **argv) {
 
     // Velocity grid allocation and initialization
 
+    // Check to see if we need to fix some velocity grids
+    double TNB_min_mass = 1e37;
+    if (TNBflag) {
+      // Check if isTNB was set
+      if (!isTNB) {
+        printf("TNB is set to on, but TNB status of the species is not set. "
+               "Please set isTNB in your input file.\n");
+        exit(37);
+      }
+      for (i = 0; i < nspec; ++i) {
+        if (isTNB[i]) { // might error out if TNB flag is set but not species
+                        // info
+          TNB_min_mass = TNB_min_mass < m[i] ? m[i] : TNB_min_mass;
+        }
+      }
+    } else { // turn off TNB
+      for (i = 0; i < nspec; ++i) {
+        isTNB[i] = 0;
+      }
+    }
+
     // set the velocity grids
     vref = malloc(nspec * sizeof(double));
     Lv = malloc(nspec * sizeof(double));
@@ -592,13 +616,17 @@ int main(int argc, char **argv) {
     double vmax = 0.0;
 
     for (i = 0; i < nspec; i++) {
-      if (T0_max > T_max[i])
-        vref[i] = sqrt((T0_max / ERG_TO_EV_CGS) / m[i]);
-      else
-        vref[i] = sqrt((T_max[i] / ERG_TO_EV_CGS) / m[i]);
+      if (isTNB[i]) { // use same ref velo for all TNB species
+        vref[i] = sqrt(T0_max / ERG_TO_EV_CGS) / TNB_min_mass;
+      } else {
+        if (T0_max > T_max[i]) {
+          vref[i] = sqrt((T0_max / ERG_TO_EV_CGS) / m[i]);
+        } else
+          vref[i] = sqrt((T_max[i] / ERG_TO_EV_CGS) / m[i]);
 
-      if (vmax < vref[i])
-        vmax = vref[i];
+        if (vmax < vref[i])
+          vmax = vref[i];
+      }
 
       Lv[i] = v_sigma * vref[i];
       c[i] = malloc(Nv * sizeof(double));
