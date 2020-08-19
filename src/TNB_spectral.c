@@ -1,6 +1,7 @@
 #include "fourier.h"
 #include "gauss_legendre.h"
 #include "units/unit_data.c"
+#include <fftw3.h>
 #include <math.h>
 #include <omp.h>
 #include <stdio.h>
@@ -18,6 +19,9 @@ static double Lv;
 
 static int first_DD = 1;
 static int first_DT = 1;
+
+static fftw_complex *temp_fftIn, *temp_fftOut;
+static fftw_complex *fftIn_g, *fftOut_g, *qHat;
 
 struct TNB_data {
   double a1;
@@ -50,6 +54,8 @@ void initializeTNB(int Nv_in, double *c_in, double *wts_in) {
   Nv = Nv_in;
   c = c_in;
   wts = wts_in;
+
+  initialize_fourier(Nv, c_in);
 
   // Set up data structures for the reactions
 
@@ -100,6 +106,13 @@ void initializeTNB(int Nv_in, double *c_in, double *wts_in) {
   DDT.mu_reaction = 1.672e-14;
 
   strcpy(DDT.name, "DD-T");
+
+  // allocate bins for ffts
+  fftIn_g = fftw_malloc(N * N * N * sizeof(fftw_complex));
+  fftOut_g = fftw_malloc(N * N * N * sizeof(fftw_complex));
+  qHat = fftw_malloc(N * N * N * sizeof(fftw_complex));
+  temp_fftIn = fftw_malloc(N * N * N * sizeof(fftw_complex));
+  temp_fftOut = fftw_malloc(N * N * N * sizeof(fftw_complex));
 }
 
 // forward declaration
@@ -144,7 +157,46 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2, int sp,
     }
   }
 
-  // More stuff to compute...
+  // Weights are loaded, now compute the ffts of the functions
+
+  // Fill fft data structions
+  for (i = 0; i < Nv; i++)
+    for (j = 0; j < Nv; j++)
+      for (k = 0; k < Nv; k++) {
+        int index = k + Nv * (j + N * i);
+        qHat[index][0] = 0.0;
+        qHat[index][1] = 0.0;
+        fftIn_f[index][0] = f1[index];
+        fftIn_f[index][1] = 0.0;
+        fftIn_g[index][0] = f2[index];
+        fftIn_g[index][1] = 0.0;
+      }
+
+  // move to fourier space - N^3 log N
+  fft3D(fftIn_g, fftOut_g, noinverse);
+
+  // Find inverse of W(m) ghat(m)
+  // note W(m) is a real function
+  // N^3
+  for (i = 0; i < Nv; i++)
+    for (j = 0; j < Nv; j++)
+      for (k = 0; k < Nv; k++) {
+        int index = k + Nv * (j + N * i);
+        temp_fftIn[index][0] = fftOut_g[index][0] * conv_weights[index];
+        temp_fftIn[index][1] = fftOut_g[index][1] * conv_weights[index];
+      }
+  fft3D(temp_fftIn, temp_fftOut, inverse); // N^3 log N
+
+  // Take product in real space
+  // Just return the real part, but check on the imag
+  // N^3
+  double imagmax = 0;
+  double imag;
+  for (int index = 0; index < Nv * Nv * Nv; ++index) {
+    Q_TNB[index] = f1[index] * temp_fftOut[index][0];
+    imag = f1[index] * temp_fftOut[index][1];
+    imagmax = imag > imagmax ? imag : imagmax;
+  }
 }
 
 double integrand(double r, void *args) {
@@ -179,9 +231,9 @@ void generate_conv_weights(double *conv_weights,
   for (int i = 0; i < Nv; ++i) {
     for (int j = 0; j < Nv; ++j) {
       for (int k = 0; k < Nv; ++k) {
-
         // add gauss legendre
         double result = gauss_legendre(64, integrand, reaction_info, 0, Lv);
+        conv_weights[k + Nv * (j + Nv * i)] = result;
       }
     }
   }
