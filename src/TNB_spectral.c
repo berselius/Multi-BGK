@@ -14,6 +14,7 @@
 static int Nv;
 static double **c;
 static double **wts;
+static double Lv;
 
 static int first_DD = 1;
 static int first_DT = 1;
@@ -44,7 +45,7 @@ static struct TNB_data DT;
 static struct TNB_data DDHE;
 static struct TNB_data DDT;
 
-void initializeTNB(int Nv_in, double **c_in, double **wts_in) {
+void initializeTNB(int Nv_in, double *c_in, double *wts_in) {
   printf("Initializing TNB\n");
   Nv = Nv_in;
   c = c_in;
@@ -66,7 +67,7 @@ void initializeTNB(int Nv_in, double **c_in, double **wts_in) {
 
   DT.mu_reaction = 2.0053e-24;
 
-  DT.name = "DT";
+  strcpy(DT.name, "DT");
 
   // DD-He3
   DDHE.a1 = 5.3701e4;
@@ -82,7 +83,7 @@ void initializeTNB(int Nv_in, double **c_in, double **wts_in) {
 
   DDHE.mu_reaction = 1.672e-14;
 
-  DDGE.name = "DD-He3";
+  strcpy(DDHE.name, "DD-He3");
 
   // DD-T
   DDT.a1 = 5.5576e4;
@@ -98,7 +99,7 @@ void initializeTNB(int Nv_in, double **c_in, double **wts_in) {
 
   DDT.mu_reaction = 1.672e-14;
 
-  DDT.name = "DD-T";
+  strcpy(DDT.name, "DD-T");
 }
 
 // forward declaration
@@ -175,16 +176,12 @@ double integrand(double r, void *args) {
 // Computes the convolution weights given the cross section parameters
 void generate_conv_weights(double *conv_weights,
                            struct TNB_data *reaction_info) {
-
-  double Lv;
-  double spmax;
-
   for (int i = 0; i < Nv; ++i) {
     for (int j = 0; j < Nv; ++j) {
       for (int k = 0; k < Nv; ++k) {
 
         // add gauss legendre
-        double result = gauss_legendre(64, integrand, args, 0, Lv);
+        double result = gauss_legendre(64, integrand, reaction_info, 0, Lv);
       }
     }
   }

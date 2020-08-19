@@ -1,4 +1,4 @@
-#ifdef _TNB_SPECTRAL_H
+#ifndef _TNB_SPECTRAL_H
 #define _TNB_SPECTRAL_H
 
 // Initializer
