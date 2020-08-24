@@ -357,9 +357,12 @@ double GetReactivity_dd_T(double mu, double *in) {
 
 //-----------------------------------------//
 
-// I think this does the actual tail depletion
-void TNB_DD(double **f, double **f_out, int sp, int rank, int TNB_FLAG,
-            double dt, double mu, double *n, double **v, double *T) {}
+// This is the main interface from other code
+// If TNB_FLAG is 1, it simply computes the reactivity
+// IF TNB_FLAG is 2, it computes reactivity and does tail depeletion
+void TNB_DD(double *f_D, double *fout_D, int rank, int TNB_FLAG, double dt,
+            double mu, double *n, double **v, double *T) {}
 
-void TNB_DT(double **f, double **f_out, int sp, int sp2, int rank, int TNB_FLAG,
-            double dt, double mu, double *n, double **v, double *T) {}
+void TNB_DT(double *f_D, double *f_T, double *fout_D, double *fout_T, int rank,
+            int TNB_FLAG, double dt, double mu, double *n, double **v,
+            double *T) {}
