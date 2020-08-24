@@ -119,18 +119,6 @@ void initializeTNB(int Nv_in, double *c_in, double *wts_in) {
 void generate_conv_weights(double *conv_weights,
                            struct TNB_data *reaction_info);
 
-double reduce_Q(double *Q) {
-
-  double Q_tot = 0.;
-
-  // Put OMP here...
-  for (int i = 0; i < Nv; i++)
-    for (int j = 0; j < Nv; j++)
-      for (int k = 0; k < Nv; k++) {
-        Q_tot += wts[i] * wts[j] * wts[k] * Q[k + Nv * (j + Nv * i)];
-      }
-}
-
 // Generic TNB calculator
 // This takes input data for the various flavors of TNB reactions
 // Not this assumes that you have already checked the species to make sure that
@@ -196,9 +184,10 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
   double imag;
   for (int index = 0; index < Nv * Nv * Nv; ++index) {
     Q_TNB[index] = f1[index] * temp_fftOut[index][0];
-    imag = f1[index] * temp_fftOut[index][1];
+    imag = fabs(f1[index] * temp_fftOut[index][1]);
     imagmax = imag > imagmax ? imag : imagmax;
   }
+  printf("imagmax %g\n", imagmax);
 }
 
 double integrand(double r, void *args) {
@@ -257,7 +246,27 @@ void GetTNB_dt(double mu, double *in_D, double *in_T, double *Q_DT) {
 
 // Calculates the total dt reaction rate in a cell
 // R_DT = \int Q_TNB(c) dc
-double GetReactivity_dt(double mu, double *in, double *in2, int sp, int sp2) {}
+double GetReactivity_dt(double mu, double *in, double *in2, int sp, int sp2) {
+  int i, j, k;
+  double *Q_tmp = malloc(Nv * Nv * Nv * sizeof(double));
+
+  GetTNB_dt(mu, in, in2, Q_tmp);
+
+  double dv3 = pow(c[1] - c[0], 3);
+  double react = 0;
+#pragma omp parallel for private(i, j, k) reduction(+ : react)
+  for (i = 0; i < Nv; i++) {
+    for (j = 0; j < Nv; j++) {
+      for (k = 0; k < Nv; k++) {
+        react += dv3 * wts[i] * wts[j] * wts[k] * Q_tmp[k + Nv * (j + Nv * i)];
+      }
+    }
+  }
+
+  free(Q_tmp);
+
+  return react;
+}
 
 //-----------------------------------------//
 
@@ -276,7 +285,26 @@ void GetTNB_dd_He(double mu, double *in, double *Q_DDHE) {
 
 // Calculates the total dd->he reaction rate in a cell
 // R_DDHe = \int Q_TNB(c) dc
-double GetReactivity_dd_He(double mu, double *in, double *Q_DDHE) {}
+double GetReactivity_dd_He(double mu, double *in, double *Q_DDHE) {
+  int i, j, k;
+  double *Q_tmp = malloc(Nv * Nv * Nv * sizeof(double));
+
+  GetTNB_dd_He(mu, in, Q_tmp);
+
+  double dv3 = pow(c[1] - c[0], 3);
+  double react = 0;
+#pragma omp parallel for private(i, j, k) reduction(+ : react)
+  for (i = 0; i < Nv; i++) {
+    for (j = 0; j < Nv; j++) {
+      for (k = 0; k < Nv; k++) {
+        react += dv3 * wts[i] * wts[j] * wts[k] * Q_tmp[k + Nv * (j + Nv * i)];
+      }
+    }
+  }
+  free(Q_tmp);
+
+  return react;
+}
 
 //-----------------------------------------//
 
@@ -296,9 +324,24 @@ void GetTNB_dd_T(double mu, double *in, double *Q_DDT) {
 // Calculates the total dd->T reaction rate in a cell, without doing depletion
 // R_DDT = \int Q_TNB(c) dc
 double GetReactivity_dd_T(double mu, double *in) {
+  int i, j, k;
   double *Q_tmp = malloc(Nv * Nv * Nv * sizeof(double));
 
   GetTNB_dd_T(mu, in, Q_tmp);
+
+  double dv3 = pow(c[1] - c[0], 3);
+  double react = 0;
+#pragma omp parallel for private(i, j, k) reduction(+ : react)
+  for (i = 0; i < Nv; i++) {
+    for (j = 0; j < Nv; j++) {
+      for (k = 0; k < Nv; k++) {
+        react += dv3 * wts[i] * wts[j] * wts[k] * Q_tmp[k + Nv * (j + Nv * i)];
+      }
+    }
+  }
+  free(Q_tmp);
+
+  return react;
 }
 
 //-----------------------------------------//
