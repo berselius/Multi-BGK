@@ -1,4 +1,5 @@
-#include "TNB.h"
+#include "TNB_spectral.h"
+//#include "TNB.h"
 #include "implicit.h"
 #include "io.h"
 #include "momentRoutines.h"
@@ -1105,14 +1106,16 @@ void BGK_im_linear(double **f, double **f_out, double *Z, double dt,
 
       mu = 0.5 * m[sp];
       if ((mu > 1.6e-24) && (mu < 1.7e-24))
-	TNB_DD(f, f_out, sp, rank, TNBFlag, dt, 0.5 * m[sp], n_linear, v_linear, T_linear);
+        TNB_DD(f, f_out, sp, rank, TNBFlag, dt, 0.5 * m[sp], n_linear, v_linear,
+               T_linear);
 
       for (sp2 = sp; sp2 < nspec; sp2++) {
-	mu =  m[sp] * m[sp2] / (m[sp] + m[sp2]);
-	
-	if((mu > 1.8e-24) && (mu < 2.0e-24))
-	  TNB_DT(f, f_out, sp, sp2, rank, TNBFlag, dt,
-               m[sp] * m[sp2] / (m[sp] + m[sp2]), n_linear, v_linear, T_linear);
+        mu = m[sp] * m[sp2] / (m[sp] + m[sp2]);
+
+        if ((mu > 1.8e-24) && (mu < 2.0e-24))
+          TNB_DT(f, f_out, sp, sp2, rank, TNBFlag, dt,
+                 m[sp] * m[sp2] / (m[sp] + m[sp2]), n_linear, v_linear,
+                 T_linear);
       }
     }
   }

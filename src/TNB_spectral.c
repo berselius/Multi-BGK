@@ -13,8 +13,8 @@
 #endif
 
 static int Nv;
-static double **c;
-static double **wts;
+static double *c;
+static double *wts;
 static double Lv;
 
 static int first_DD = 1;
@@ -89,7 +89,7 @@ void initializeTNB(int Nv_in, double *c_in, double *wts_in) {
 
   DDHE.mu_reaction = 1.672e-14;
 
-  strcpy(DDHE.name, "DD-He3");
+  strcpy(DDHE.name, "DD_He3");
 
   // DD-T
   DDT.a1 = 5.5576e4;
@@ -105,26 +105,38 @@ void initializeTNB(int Nv_in, double *c_in, double *wts_in) {
 
   DDT.mu_reaction = 1.672e-14;
 
-  strcpy(DDT.name, "DD-T");
+  strcpy(DDT.name, "DD_T");
 
   // allocate bins for ffts
-  fftIn_g = fftw_malloc(N * N * N * sizeof(fftw_complex));
-  fftOut_g = fftw_malloc(N * N * N * sizeof(fftw_complex));
-  qHat = fftw_malloc(N * N * N * sizeof(fftw_complex));
-  temp_fftIn = fftw_malloc(N * N * N * sizeof(fftw_complex));
-  temp_fftOut = fftw_malloc(N * N * N * sizeof(fftw_complex));
+  fftIn_g = fftw_malloc(Nv * Nv * Nv * sizeof(fftw_complex));
+  fftOut_g = fftw_malloc(Nv * Nv * Nv * sizeof(fftw_complex));
+  qHat = fftw_malloc(Nv * Nv * Nv * sizeof(fftw_complex));
+  temp_fftIn = fftw_malloc(Nv * Nv * Nv * sizeof(fftw_complex));
+  temp_fftOut = fftw_malloc(Nv * Nv * Nv * sizeof(fftw_complex));
 }
 
 // forward declaration
 void generate_conv_weights(double *conv_weights,
                            struct TNB_data *reaction_info);
 
+double reduce_Q(double *Q) {
+
+  double Q_tot = 0.;
+
+  // Put OMP here...
+  for (int i = 0; i < Nv; i++)
+    for (int j = 0; j < Nv; j++)
+      for (int k = 0; k < Nv; k++) {
+        Q_tot += wts[i] * wts[j] * wts[k] * Q[k + Nv * (j + Nv * i)];
+      }
+}
+
 // Generic TNB calculator
 // This takes input data for the various flavors of TNB reactions
 // Not this assumes that you have already checked the species to make sure that
 // it is TNB Computes Q_TNB(c) = \int |g| \sigma(|g|) f_1(c) f_2(c_\ast) d\c_ast
-void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2, int sp,
-                 int sp2, double *Q_TNB) {
+void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
+                 double *Q_TNB) {
 
   // Initialize Q_TNB
   for (int i = 0; i < Nv * Nv * Nv; i++) {
@@ -160,32 +172,22 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2, int sp,
   // Weights are loaded, now compute the ffts of the functions
 
   // Fill fft data structions
-  for (i = 0; i < Nv; i++)
-    for (j = 0; j < Nv; j++)
-      for (k = 0; k < Nv; k++) {
-        int index = k + Nv * (j + N * i);
-        qHat[index][0] = 0.0;
-        qHat[index][1] = 0.0;
-        fftIn_f[index][0] = f1[index];
-        fftIn_f[index][1] = 0.0;
-        fftIn_g[index][0] = f2[index];
-        fftIn_g[index][1] = 0.0;
-      }
+  for (int index = 0; index < Nv * Nv * Nv; ++index) {
+    fftIn_g[index][0] = f2[index];
+    fftIn_g[index][1] = 0.0;
+  }
 
   // move to fourier space - N^3 log N
-  fft3D(fftIn_g, fftOut_g, noinverse);
+  fft3D(fftIn_g, fftOut_g, 0);
 
   // Find inverse of W(m) ghat(m)
   // note W(m) is a real function
   // N^3
-  for (i = 0; i < Nv; i++)
-    for (j = 0; j < Nv; j++)
-      for (k = 0; k < Nv; k++) {
-        int index = k + Nv * (j + N * i);
-        temp_fftIn[index][0] = fftOut_g[index][0] * conv_weights[index];
-        temp_fftIn[index][1] = fftOut_g[index][1] * conv_weights[index];
-      }
-  fft3D(temp_fftIn, temp_fftOut, inverse); // N^3 log N
+  for (int index = 0; index < Nv * Nv * Nv; ++index) {
+    temp_fftIn[index][0] = fftOut_g[index][0] * conv_weights[index];
+    temp_fftIn[index][1] = fftOut_g[index][1] * conv_weights[index];
+  }
+  fft3D(temp_fftIn, temp_fftOut, 1); // N^3 log N
 
   // Take product in real space
   // Just return the real part, but check on the imag
@@ -241,47 +243,80 @@ void generate_conv_weights(double *conv_weights,
 
 // Calculates loss function due to DT TNB reactions for all velocity points
 // Q_TNB(c) = \int g sigma_{DT}(g) f(c) f(v_\ast) d \v_ast
-double GetTNB_dt(double mu, double *in, double *c1, int sp, int sp2);
+void GetTNB_dt(double mu, double *in_D, double *in_T, double *Q_DT) {
+
+  // Check that we have the right reaction
+  if (abs(mu - DT.mu_reaction) / DT.mu_reaction > 1e-3) {
+    // this is not a DT reaction
+    printf("Warning - this is not a DT reaction - given mu=%g, DT mu is %g\n",
+           mu, DT.mu_reaction);
+    return;
+  }
+  TNB_generic(&DDHE, in_D, in_T, Q_DT);
+}
 
 // Calculates the total dt reaction rate in a cell
 // R_DT = \int Q_TNB(c) dc
-double GetReactivity_dt(double mu, double *in, double *in2, int sp, int sp2);
+double GetReactivity_dt(double mu, double *in, double *in2, int sp, int sp2) {}
 
 //-----------------------------------------//
 
 // Calculates loss function due to dd->he TNB reactions for all velocity points
 // Q_TNB(c) = \int g sigma_{DDHe}(g) f(c) f(v_\ast) d \v_ast
-double GetTNB_dd_He(double mu, double *in, double *c1, int sp, int sp2);
+void GetTNB_dd_He(double mu, double *in, double *Q_DDHE) {
+  // Check that we have the right reaction
+  if (abs(mu - DDHE.mu_reaction) / DDHE.mu_reaction > 1e-3) {
+    // this is not a DT reaction
+    printf("Warning - This is not a DD reaction - given mu=%g, DD mu is %g\n",
+           mu, DDHE.mu_reaction);
+    return;
+  }
+  TNB_generic(&DDHE, in, in, Q_DDHE);
+}
 
 // Calculates the total dd->he reaction rate in a cell
 // R_DDHe = \int Q_TNB(c) dc
-double GetReactivity_dd_He(double mu, double *in, double *in2, int sp, int sp2);
+double GetReactivity_dd_He(double mu, double *in, double *Q_DDHE) {}
 
 //-----------------------------------------//
 
 // Calculates loss function due to dd->T TNB reactions for all velocity points
 // Q_TNB(c) = \int g sigma_{DDT}(g) f(c) f(v_\ast) d \v_ast
-double GetTNB_dd_T(double mu, double *in, double *c1, int sp, int sp2);
+void GetTNB_dd_T(double mu, double *in, double *Q_DDT) {
+  // Check that we have the right reaction
+  if (abs(mu - DDT.mu_reaction) / DDT.mu_reaction > 1e-3) {
+    // this is not a DT reaction
+    printf("Warning - this is not a DD reaction - given mu=%g, DD mu is %g\n",
+           mu, DDT.mu_reaction);
+    return;
+  }
+  TNB_generic(&DDT, in, in, Q_DDT);
+}
 
-// Calculates the total dd->T reaction rate in a cell
+// Calculates the total dd->T reaction rate in a cell, without doing depletion
 // R_DDT = \int Q_TNB(c) dc
-double GetReactivity_dd_T(double mu, double *in, double *in2, int sp, int sp2);
+double GetReactivity_dd_T(double mu, double *in) {
+  double *Q_tmp = malloc(Nv * Nv * Nv * sizeof(double));
+
+  GetTNB_dd_T(mu, in, Q_tmp);
+}
 
 //-----------------------------------------//
 
 // Calculates loss function due to TT TNB reactions for all velocity points
 // Q_TNB(c) = \int g sigma_{TT}(g) f(c) f(v_\ast) d \v_ast
-double GetTNB_tt(double mu, double *in, double *c1, int sp, int sp2);
+// double GetTNB_tt(double mu, double *in, double *c1, int sp, int sp2) {}
 
 // Calculates the total TT reaction rate in a cell
 // R_TT = \int Q_TNB(c) dc
-double GetReactivity_tt(double mu, double *in, double *in2, int sp, int sp2);
+// double GetReactivity_tt(double mu, double *in, double *in2, int sp, int sp2)
+// {}
 
 //-----------------------------------------//
 
 // I think this does the actual tail depletion
 void TNB_DD(double **f, double **f_out, int sp, int rank, int TNB_FLAG,
-            double dt, double mu, double *n, double **v, double *T);
+            double dt, double mu, double *n, double **v, double *T) {}
 
 void TNB_DT(double **f, double **f_out, int sp, int sp2, int rank, int TNB_FLAG,
-            double dt, double mu, double *n, double **v, double *T);
+            double dt, double mu, double *n, double **v, double *T) {}
