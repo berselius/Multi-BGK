@@ -41,10 +41,10 @@ double GetReactivity(double *Q_in);
 // If TNB_FLAG is 2, it computes reactivity and does tail depeletion
 // In both cases it writes reactivity info to a file in Data/
 void TNB_DD(double *f_D, double *fout_D, int rank, int TNB_FLAG, double dt,
-            double mu, double *n, double **v, double *T);
+            double mu, double n, double T);
 
 void TNB_DT(double *f_D, double *f_T, double *fout_D, double *fout_T, int rank,
-            int TNB_FLAG, double dt, double mu, double *n, double **v,
-            double *T);
+            int TNB_FLAG, double dt, double mu, double n1, double n2, double T1,
+            double T2);
 
 #endif
