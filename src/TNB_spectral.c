@@ -263,7 +263,7 @@ void GetTNB_dt(double mu, double *in_D, double *in_T, double *Q_DT) {
            mu, DT.mu_reaction);
     return;
   }
-  TNB_generic(&DDHE, in_D, in_T, Q_DT);
+  TNB_generic(&DT, in_D, in_T, Q_DT);
 }
 
 //-----------------------------------------//
