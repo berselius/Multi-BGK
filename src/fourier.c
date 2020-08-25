@@ -65,7 +65,6 @@ void fft3D(fftw_complex *in, fftw_complex *out, int invert) {
   double delta, L_start, L_end, sign, *varr;
   fftw_plan p;
 
-  printf("Forward/backward setup\n");
   if (invert == noinverse) {
     delta = dv;
     L_start = Lk;
@@ -87,8 +86,6 @@ void fft3D(fftw_complex *in, fftw_complex *out, int invert) {
   }
   prefactor = scale3 * delta * delta * delta;
 
-  printf("Grid shift\n");
-
   // shift the 'v' terms in the exponential to reflect our velocity domain
   for (index = 0; index < N * N * N; index++) {
     i = index / (N * N);
@@ -106,12 +103,8 @@ void fft3D(fftw_complex *in, fftw_complex *out, int invert) {
         factor * (cos(sum) * in[index][1] + sin(sum) * in[index][0]);
   }
 
-  printf("Execute fft\n");
-
   // computes fft
   fftw_execute(p);
-
-  printf("shift again\n");
 
   // shifts the 'eta' terms to reflect our fourier domain
   for (index = 0; index < N * N * N; index++) {

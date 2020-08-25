@@ -170,12 +170,8 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
     fftIn_g[index][1] = 0.0;
   }
 
-  printf("fft filled\n");
-
   // move to fourier space - N^3 log N
   fft3D(fftIn_g, fftOut_g, 0);
-
-  printf("FFT computed\n");
 
   // Find inverse of W(m) ghat(m)
   // note W(m) is a real function
@@ -185,11 +181,7 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
     temp_fftIn[index][1] = fftOut_g[index][1] * conv_weights[index];
   }
 
-  printf("FFT product done\n");
-
   fft3D(temp_fftIn, temp_fftOut, 1); // N^3 log N
-
-  printf("inv FFT done\n");
 
   // Take product in real space
   // Just return the real part, but check on the imag
@@ -201,7 +193,6 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
     imag = fabs(f1[index] * temp_fftOut[index][1]);
     imagmax = imag > imagmax ? imag : imagmax;
   }
-  printf("imagmax %g\n", imagmax);
 }
 
 double integrand(double r, void *args) {
