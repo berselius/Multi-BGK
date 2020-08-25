@@ -230,6 +230,23 @@ void generate_conv_weights(double *conv_weights,
   }
 }
 
+// Calculates the total TNB reaction rate in a cell
+// R_DT = \int Q_TNB(c) dc
+double GetReactivity(double *Q_TNB) {
+  int i, j, k;
+
+  double react = 0;
+#pragma omp parallel for private(i, j, k) reduction(+ : react)
+  for (i = 0; i < Nv; i++) {
+    for (j = 0; j < Nv; j++) {
+      for (k = 0; k < Nv; k++) {
+        react += wts[i] * wts[j] * wts[k] * Q_TNB[k + Nv * (j + Nv * i)];
+      }
+    }
+  }
+  return react;
+}
+
 // Calculates loss function due to DT TNB reactions for all velocity points
 // Q_TNB(c) = \int g sigma_{DT}(g) f(c) f(v_\ast) d \v_ast
 void GetTNB_dt(double mu, double *in_D, double *in_T, double *Q_DT) {
@@ -242,30 +259,6 @@ void GetTNB_dt(double mu, double *in_D, double *in_T, double *Q_DT) {
     return;
   }
   TNB_generic(&DDHE, in_D, in_T, Q_DT);
-}
-
-// Calculates the total dt reaction rate in a cell
-// R_DT = \int Q_TNB(c) dc
-double GetReactivity_dt(double mu, double *in, double *in2, int sp, int sp2) {
-  int i, j, k;
-  double *Q_tmp = malloc(Nv * Nv * Nv * sizeof(double));
-
-  GetTNB_dt(mu, in, in2, Q_tmp);
-
-  double dv3 = pow(c[1] - c[0], 3);
-  double react = 0;
-#pragma omp parallel for private(i, j, k) reduction(+ : react)
-  for (i = 0; i < Nv; i++) {
-    for (j = 0; j < Nv; j++) {
-      for (k = 0; k < Nv; k++) {
-        react += dv3 * wts[i] * wts[j] * wts[k] * Q_tmp[k + Nv * (j + Nv * i)];
-      }
-    }
-  }
-
-  free(Q_tmp);
-
-  return react;
 }
 
 //-----------------------------------------//
@@ -283,29 +276,6 @@ void GetTNB_dd_He(double mu, double *in, double *Q_DDHE) {
   TNB_generic(&DDHE, in, in, Q_DDHE);
 }
 
-// Calculates the total dd->he reaction rate in a cell
-// R_DDHe = \int Q_TNB(c) dc
-double GetReactivity_dd_He(double mu, double *in, double *Q_DDHE) {
-  int i, j, k;
-  double *Q_tmp = malloc(Nv * Nv * Nv * sizeof(double));
-
-  GetTNB_dd_He(mu, in, Q_tmp);
-
-  double dv3 = pow(c[1] - c[0], 3);
-  double react = 0;
-#pragma omp parallel for private(i, j, k) reduction(+ : react)
-  for (i = 0; i < Nv; i++) {
-    for (j = 0; j < Nv; j++) {
-      for (k = 0; k < Nv; k++) {
-        react += dv3 * wts[i] * wts[j] * wts[k] * Q_tmp[k + Nv * (j + Nv * i)];
-      }
-    }
-  }
-  free(Q_tmp);
-
-  return react;
-}
-
 //-----------------------------------------//
 
 // Calculates loss function due to dd->T TNB reactions for all velocity points
@@ -319,29 +289,6 @@ void GetTNB_dd_T(double mu, double *in, double *Q_DDT) {
     return;
   }
   TNB_generic(&DDT, in, in, Q_DDT);
-}
-
-// Calculates the total dd->T reaction rate in a cell, without doing depletion
-// R_DDT = \int Q_TNB(c) dc
-double GetReactivity_dd_T(double mu, double *in) {
-  int i, j, k;
-  double *Q_tmp = malloc(Nv * Nv * Nv * sizeof(double));
-
-  GetTNB_dd_T(mu, in, Q_tmp);
-
-  double dv3 = pow(c[1] - c[0], 3);
-  double react = 0;
-#pragma omp parallel for private(i, j, k) reduction(+ : react)
-  for (i = 0; i < Nv; i++) {
-    for (j = 0; j < Nv; j++) {
-      for (k = 0; k < Nv; k++) {
-        react += dv3 * wts[i] * wts[j] * wts[k] * Q_tmp[k + Nv * (j + Nv * i)];
-      }
-    }
-  }
-  free(Q_tmp);
-
-  return react;
 }
 
 //-----------------------------------------//
@@ -361,8 +308,108 @@ double GetReactivity_dd_T(double mu, double *in) {
 // If TNB_FLAG is 1, it simply computes the reactivity
 // IF TNB_FLAG is 2, it computes reactivity and does tail depeletion
 void TNB_DD(double *f_D, double *fout_D, int rank, int TNB_FLAG, double dt,
-            double mu, double *n, double **v, double *T) {}
+            double mu, double n, double *v, double T) {
+
+  char buffer[50];
+  FILE *fpij;
+  sprintf(buffer, "Data/TNB_DD_%d.dat", rank);
+
+  double *Q_TNB_HE = malloc(Nv * Nv * Nv * sizeof(double));
+  double *Q_TNB_T = malloc(Nv * Nv * Nv * sizeof(double));
+
+  if (n > EPS_COLL) {
+
+    // Calculate Q_TNB
+    GetTNB_dd_He(mu, f_D, Q_TNB_HE);
+    GetTNB_dd_T(mu, f_D, Q_TNB_T);
+
+    // Get the reactivities
+    double He_react = GetReactivity(Q_TNB_HE);
+    double T_react = GetReactivity(Q_TNB_T);
+
+    // Do tail depletion
+    if (TNB_FLAG == 2) {
+      for (int vx = 0; vx < Nv; vx++)
+        for (int vy = 0; vy < Nv; vy++)
+          for (int vz = 0; vz < Nv; vz++) {
+            int index = vz + Nv * (vy + Nv * vx);
+            fout_D[index] -=
+                f_D[index] * (Q_TNB_HE[index] + Q_TNB_T[index]) * dt;
+          }
+    }
+
+    if (first_DD) {
+      fpij = fopen(buffer, "w");
+      first_DD = 0;
+    } else
+      fpij = fopen(buffer, "a");
+
+    fprintf(fpij, "%5.2e %5.2e %10.6e %10.6e\n", n, T, He_react, T_react);
+    fclose(fpij);
+  } else {
+    if (first_DD) {
+      fpij = fopen(buffer, "w");
+      first_DD = 0;
+    } else
+      fpij = fopen(buffer, "a");
+    fprintf(fpij, "%5.2e %5.2e %10.6e %10.6e\n", n, T, 0.0, 0.0);
+    fclose(fpij);
+  }
+
+  free(Q_TNB_HE);
+  free(Q_TNB_T);
+}
 
 void TNB_DT(double *f_D, double *f_T, double *fout_D, double *fout_T, int rank,
-            int TNB_FLAG, double dt, double mu, double *n, double **v,
-            double *T) {}
+            int TNB_FLAG, double dt, double mu, double n1, double n2, double T1,
+            double T2) {
+
+  char buffer[50];
+  FILE *fpij;
+  sprintf(buffer, "Data/TNB_DT_%d.dat", rank);
+
+  double *Q_TNB_D = malloc(Nv * Nv * Nv * sizeof(double));
+  double *Q_TNB_T = malloc(Nv * Nv * Nv * sizeof(double));
+
+  if ((n1 > EPS_COLL) && (n2 > EPS_COLL)) {
+
+    // Calculate Q_TNB
+    GetTNB_dt(mu, f_D, f_T, Q_TNB_D);
+    GetTNB_dt(mu, f_T, f_D, Q_TNB_T);
+
+    // Get the reactivities
+    double DT_react = GetReactivity(Q_TNB_D);
+
+    // Do tail depletion
+    if (TNB_FLAG == 2) {
+      for (int vx = 0; vx < Nv; vx++)
+        for (int vy = 0; vy < Nv; vy++)
+          for (int vz = 0; vz < Nv; vz++) {
+            int index = vz + Nv * (vy + Nv * vx);
+            fout_D[index] -= f_D[index] * (Q_TNB_D[index]) * dt;
+            fout_T[index] -= f_T[index] * (Q_TNB_T[index]) * dt;
+          }
+    }
+
+    if (first_DT) {
+      fpij = fopen(buffer, "w");
+      first_DT = 0;
+    } else
+      fpij = fopen(buffer, "a");
+
+    fprintf(fpij, "%5.2e %5.2e %5.2e %5.2e %10.6e \n", n1, n2, T1, T2,
+            DT_react);
+    fclose(fpij);
+  } else {
+    if (first_DT) {
+      fpij = fopen(buffer, "w");
+      first_DT = 0;
+    } else
+      fpij = fopen(buffer, "a");
+    fprintf(fpij, "%5.2e %5.2e %5.2e %5.2e %10.6e \n", n1, n2, T1, T2, 0.0);
+    fclose(fpij);
+  }
+
+  free(Q_TNB_D);
+  free(Q_TNB_T);
+}

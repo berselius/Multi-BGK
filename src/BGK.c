@@ -580,7 +580,7 @@ void BGK_ex(double **f, double **f_out, double *Z, double dt, double Te) {
         }
         // Check do see if this is DD, do TNB if needed
         if ((TNBFlag > 0) && (mu > 1.6e-24) && (mu < 1.7e-24)) {
-          TNB_DD(f, f_out, i, rank, TNBFlag, 1.0, mu, n, v, T);
+          TNB_DD(f[i], f_out[i], rank, TNBFlag, 1.0, mu, n, v, T);
         }
       } else { // ij case
         if (!((n[i] < EPS_COLL) || (n[j] < EPS_COLL))) {
@@ -641,7 +641,14 @@ void BGK_ex(double **f, double **f_out, double *Z, double dt, double Te) {
 
         // Check for DT reaction
         if ((TNBFlag > 0) && (mu > 1.8e-24) && (mu < 2.0e-24)) {
-          TNB_DT(f, f_out, i, j, rank, TNBFlag, 1.0, mu, n, v, T);
+          // make sure D is first
+          if (m[i] < m[j]) {
+            TNB_DT(f[i], f[j], f_out[i], f_out[j], rank, TNBFlag, 1.0, mu, n, v,
+                   T);
+          } else {
+            TNB_DT(f[j], f[i], f_out[j], f_out[i], rank, TNBFlag, 1.0, mu, n, v,
+                   T);
+          }
         }
       }
     }
@@ -1106,16 +1113,22 @@ void BGK_im_linear(double **f, double **f_out, double *Z, double dt,
 
       mu = 0.5 * m[sp];
       if ((mu > 1.6e-24) && (mu < 1.7e-24))
-        TNB_DD(f, f_out, sp, rank, TNBFlag, dt, 0.5 * m[sp], n_linear, v_linear,
-               T_linear);
+        TNB_DD(f[sp], f_out[sp], rank, TNBFlag, dt, 0.5 * m[sp], n_linear,
+               v_linear, T_linear);
 
       for (sp2 = sp; sp2 < nspec; sp2++) {
         mu = m[sp] * m[sp2] / (m[sp] + m[sp2]);
 
-        if ((mu > 1.8e-24) && (mu < 2.0e-24))
-          TNB_DT(f, f_out, sp, sp2, rank, TNBFlag, dt,
-                 m[sp] * m[sp2] / (m[sp] + m[sp2]), n_linear, v_linear,
-                 T_linear);
+        if ((mu > 1.8e-24) && (mu < 2.0e-24)) {
+          // make sure D is first species
+          if (m[sp] < m[sp2]) {
+            TNB_DT(f[sp], f[sp2], f_out[sp], f_out[sp2], rank, TNBFlag, dt, mu,
+                   n_linear, v_linear, T_linear);
+          } else {
+            TNB_DT(f[sp2], f[sp], f_out[sp2], f_out[sp], rank, TNBFlag, dt, mu,
+                   n_linear, v_linear, T_linear);
+          }
+        }
       }
     }
   }
