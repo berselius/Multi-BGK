@@ -49,6 +49,8 @@ void initialize_fourier(int modes, double *vel) {
   }
   wtN[N - 1] = 0.5;
 
+  temp = fftw_malloc(N * N * N * sizeof(fftw_complex));
+
   // Set up fftw infrastructure
   p_forward =
       fftw_plan_dft_3d(N, N, N, temp, temp, FFTW_FORWARD, FFTW_ESTIMATE);
@@ -63,6 +65,7 @@ void fft3D(fftw_complex *in, fftw_complex *out, int invert) {
   double delta, L_start, L_end, sign, *varr;
   fftw_plan p;
 
+  printf("Forward/backward setup\n");
   if (invert == noinverse) {
     delta = dv;
     L_start = Lk;
@@ -84,6 +87,8 @@ void fft3D(fftw_complex *in, fftw_complex *out, int invert) {
   }
   prefactor = scale3 * delta * delta * delta;
 
+  printf("Grid shift\n");
+
   // shift the 'v' terms in the exponential to reflect our velocity domain
   for (index = 0; index < N * N * N; index++) {
     i = index / (N * N);
@@ -100,8 +105,13 @@ void fft3D(fftw_complex *in, fftw_complex *out, int invert) {
     temp[index][1] =
         factor * (cos(sum) * in[index][1] + sin(sum) * in[index][0]);
   }
+
+  printf("Execute fft\n");
+
   // computes fft
   fftw_execute(p);
+
+  printf("shift again\n");
 
   // shifts the 'eta' terms to reflect our fourier domain
   for (index = 0; index < N * N * N; index++) {

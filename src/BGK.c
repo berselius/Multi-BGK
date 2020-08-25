@@ -642,6 +642,7 @@ void BGK_ex(double **f, double **f_out, double *Z, double dt, double Te) {
         // Check for DT reaction
         if ((TNBFlag > 0) && (mu > 1.8e-24) && (mu < 2.0e-24)) {
           printf("sending... %g %g %g %g\n", n[i], n[j], T[i], T[j]);
+          fflush(stdout);
           TNB_DT(f[i], f[j], f_out[i], f_out[j], rank, TNBFlag, 1.0, mu, n[i],
                  n[j], T[i], T[j]);
         }
