@@ -535,7 +535,6 @@ int main(int argc, char **argv) {
           marginal_oned[s][j] = malloc(Nv * sizeof(double));
       }
     }
-
     if (input_file_data_flag) {
       if (rank == 0) {
         printf("input_file_data_flag: %d, filename: %s\n", input_file_data_flag,
@@ -599,7 +598,7 @@ int main(int argc, char **argv) {
       for (i = 0; i < nspec; ++i) {
         if (isTNB[i]) { // might error out if TNB flag is set but not species
                         // info
-          TNB_min_mass = TNB_min_mass < m[i] ? m[i] : TNB_min_mass;
+          TNB_min_mass = TNB_min_mass > m[i] ? m[i] : TNB_min_mass;
         }
       }
     } else { // turn off TNB
@@ -618,20 +617,30 @@ int main(int argc, char **argv) {
 
     for (i = 0; i < nspec; i++) {
       if (isTNB[i]) { // use same ref velo for all TNB species
-        vref[i] = sqrt(T0_max / ERG_TO_EV_CGS) / TNB_min_mass;
+        vref[i] = sqrt(T0_max / ERG_TO_EV_CGS / TNB_min_mass);
       } else {
         if (T0_max > T_max[i]) {
           vref[i] = sqrt((T0_max / ERG_TO_EV_CGS) / m[i]);
         } else
           vref[i] = sqrt((T_max[i] / ERG_TO_EV_CGS) / m[i]);
-
-        if (vmax < vref[i])
-          vmax = vref[i];
       }
+
+      if (vmax < vref[i])
+        vmax = vref[i];
 
       Lv[i] = v_sigma * vref[i];
       c[i] = malloc(Nv * sizeof(double));
       wts[i] = malloc(Nv * sizeof(double));
+    }
+
+    if (TNBFlag) {
+      printf("TNB species grid info\n");
+      printf("---------------------\n");
+      printf("TNB_min_mass: %g\n", TNB_min_mass);
+      printf("TNB ref temp: %g\n", T0_max);
+      printf("TNB vref: %g\n", sqrt(T0_max / ERG_TO_EV_CGS / TNB_min_mass));
+      printf("TNB Lv: %g\n",
+             v_sigma * sqrt(T0_max / ERG_TO_EV_CGS / TNB_min_mass));
     }
 
     double CFL = dt * vmax / dx;

@@ -371,6 +371,8 @@ void TNB_DT(double *f_D, double *f_T, double *fout_D, double *fout_T, int rank,
   double *Q_TNB_D = malloc(Nv * Nv * Nv * sizeof(double));
   double *Q_TNB_T = malloc(Nv * Nv * Nv * sizeof(double));
 
+  printf("DT TNB n:%g %g T:%g %g\n", n1, n2, T1, T2);
+
   if ((n1 > EPS_COLL) && (n2 > EPS_COLL)) {
 
     // Calculate Q_TNB
