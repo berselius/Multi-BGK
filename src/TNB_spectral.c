@@ -119,6 +119,23 @@ void initializeTNB(int Nv_in, double *c_in, double *wts_in) {
 void generate_conv_weights(double *conv_weights,
                            struct TNB_data *reaction_info);
 
+void checkNanFFT(fftw_complex *in) {
+
+  for (int i = 0; i < Nv; ++i) {
+    for (int j = 0; j < Nv; ++j) {
+      for (int k = 0; k < Nv; ++k) {
+        if (isnan(in[k + Nv * (j + Nv * i)][0])) {
+          printf("nan at %d %d %d, real\n", i, j, k);
+          exit(37);
+        } else if (isnan(in[k + Nv * (j + Nv * i)][1])) {
+          printf("nan at %d %d %d, imag\n", i, j, k);
+          exit(37);
+        }
+      }
+    }
+  }
+}
+
 // Generic TNB calculator
 // This takes input data for the various flavors of TNB reactions
 // Not this assumes that you have already checked the species to make sure that
@@ -143,8 +160,6 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
 
   FILE *fidWeights;
   if ((fidWeights = fopen(weight_filename, "r"))) {
-    printf("Loading weights from %s\n", weight_filename);
-    fflush(stdout);
     fread(conv_weights, sizeof(double), Nv * Nv * Nv, fidWeights);
   } else {
     printf("Weights for %s not found, generating and storing in %s\n",
@@ -155,7 +170,6 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
 
     fidWeights = fopen(weight_filename, "w");
     fwrite(conv_weights, sizeof(double), Nv * Nv * Nv, fidWeights);
-    printf("Weights stored for %s\n", reaction_info->name);
     if (fflush(fidWeights) != 0) {
       printf("Something is wrong with storing the weights");
       exit(0);
@@ -173,6 +187,9 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
   // move to fourier space - N^3 log N
   fft3D(fftIn_g, fftOut_g, 0);
 
+  printf("First FFT\n");
+  checkNanFFT(fftOut_g);
+
   // Find inverse of W(m) ghat(m)
   // note W(m) is a real function
   // N^3
@@ -181,7 +198,13 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
     temp_fftIn[index][1] = fftOut_g[index][1] * conv_weights[index];
   }
 
+  printf("After product\n");
+  checkNanFFT(temp_fftIn);
+
   fft3D(temp_fftIn, temp_fftOut, 1); // N^3 log N
+
+  printf("Back to v space\n");
+  checkNanFFT(temp_fftOut);
 
   // Take product in real space
   // Just return the real part, but check on the imag
@@ -338,8 +361,7 @@ void TNB_DD(double *f_D, double *fout_D, int rank, int TNB_FLAG, double dt,
         for (int vy = 0; vy < Nv; vy++)
           for (int vz = 0; vz < Nv; vz++) {
             int index = vz + Nv * (vy + Nv * vx);
-            fout_D[index] -=
-                f_D[index] * (Q_TNB_HE[index] + Q_TNB_T[index]) * dt;
+            fout_D[index] -= (Q_TNB_HE[index] + Q_TNB_T[index]) * dt;
           }
     }
 
@@ -376,8 +398,6 @@ void TNB_DT(double *f_D, double *f_T, double *fout_D, double *fout_T, int rank,
   double *Q_TNB_D = malloc(Nv * Nv * Nv * sizeof(double));
   double *Q_TNB_T = malloc(Nv * Nv * Nv * sizeof(double));
 
-  printf("DT TNB n:%g %g T:%g %g\n", n1, n2, T1, T2);
-
   if ((n1 > EPS_COLL) && (n2 > EPS_COLL)) {
 
     // Calculate Q_TNB
@@ -393,8 +413,8 @@ void TNB_DT(double *f_D, double *f_T, double *fout_D, double *fout_T, int rank,
         for (int vy = 0; vy < Nv; vy++)
           for (int vz = 0; vz < Nv; vz++) {
             int index = vz + Nv * (vy + Nv * vx);
-            fout_D[index] -= f_D[index] * (Q_TNB_D[index]) * dt;
-            fout_T[index] -= f_T[index] * (Q_TNB_T[index]) * dt;
+            fout_D[index] -= Q_TNB_D[index] * dt;
+            fout_T[index] -= Q_TNB_T[index] * dt;
           }
     }
 

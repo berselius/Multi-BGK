@@ -86,6 +86,9 @@ void fft3D(fftw_complex *in, fftw_complex *out, int invert) {
   }
   prefactor = scale3 * delta * delta * delta;
 
+  printf("delta %g Lstart %g Lend %g sign %g varr[0] %g\n", delta, L_start,
+         L_end, sign, varr[0]);
+
   // shift the 'v' terms in the exponential to reflect our velocity domain
   for (index = 0; index < N * N * N; index++) {
     i = index / (N * N);

@@ -811,8 +811,15 @@ int main(int argc, char **argv) {
   initialize_BGK(nspec, Nv, m, c, order, ecouple, CL_type, ion_type, MT_or_TR,
                  tauFlag, TNBFlag, input_filename);
 
-  if (TNBFlag)
-    initializeTNB(Nv, c, wts);
+  if (TNBFlag) {
+    // Find the first TNB species
+    for (s = 0; s < nspec; s++) {
+      if (isTNB[s]) {
+        initializeTNB(Nv, c[s], wts[s]);
+        break;
+      }
+    }
+  }
 
   if (!((restartFlag == 2) || (restartFlag == 4))) {
     t = 0.0;
