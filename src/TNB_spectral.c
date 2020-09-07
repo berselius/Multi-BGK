@@ -218,6 +218,8 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
 
   // Weights are loaded, now compute the ffts of the functions
 
+  initialize_fourier(Nv, c);
+
   // Fill fft data structions
   for (int index = 0; index < Nv * Nv * Nv; ++index) {
     fftIn_g[index][0] = f2[index];

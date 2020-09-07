@@ -36,7 +36,7 @@ void initialize_fourier(int modes, double *vel) {
 
   k_arr = (double *)malloc(N * sizeof(double));
 
-  dk = 2 * M_PI * N / dv;
+  dk = (2 * M_PI / N) / dv;
   Lk = 0.5 * (N - 1) * dk;
   for (int i = 0; i < N; i++) {
     k_arr[i] = -Lk + i * dk;
