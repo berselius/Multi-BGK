@@ -155,7 +155,7 @@ double sigmavbar(double n, double T) {
   double theta = T / denom;
   double xi = pow(DDT.B_G * DDT.B_G / 4.0 / theta, 1.0 / 3.0);
 
-  return n * n * DDT.c1 * theta * sqrt(xi / T / T / T / 937814) *
+  return n * n * DDT.c1 * theta * sqrt(xi / T / T / T / 937814.) *
          exp(-3.0 * xi);
 }
 
@@ -227,7 +227,7 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
   }
 
   // move to fourier space - N^3 log N
-  fft3D(fftIn_g, fftOut_g, 0);
+  fft3D(fftIn_g, fftOut_g, 1);
 
   checkNanFFT(fftOut_g);
 
@@ -241,7 +241,7 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
 
   checkNanFFT(temp_fftIn);
 
-  fft3D(temp_fftIn, temp_fftOut, 1); // N^3 log N
+  fft3D(temp_fftIn, temp_fftOut, -1); // N^3 log N
 
   checkNanFFT(temp_fftOut);
 
@@ -427,7 +427,7 @@ void TNB_DD(double *f_D, double *fout_D, int rank, int TNB_FLAG, double dt,
       first_DD = 0;
     } else
       fpij = fopen(buffer, "a");
-    fprintf(fpij, "%5.2e %5.2e %10.6e %10.6e\n", n, T, 0.0, 0.0);
+    fprintf(fpij, "%5.2e %5.2e %10.6e %10.6e %10.6e \n", n, T, 0.0, 0.0, 0.0);
     fclose(fpij);
   }
 
@@ -472,8 +472,7 @@ void TNB_DT(double *f_D, double *f_T, double *fout_D, double *fout_T, int rank,
     } else
       fpij = fopen(buffer, "a");
 
-    fprintf(fpij, "%5.2e %5.2e %5.2e %5.2e %10.6e \n", n1, n2, T1, T2,
-            DT_react);
+    fprintf(fpij, "%5.2e %5.2e %5.2e %5.2e %10.6e\n", n1, n2, T1, T2, DT_react);
     fclose(fpij);
   } else {
     if (first_DT) {
@@ -481,7 +480,7 @@ void TNB_DT(double *f_D, double *f_T, double *fout_D, double *fout_T, int rank,
       first_DT = 0;
     } else
       fpij = fopen(buffer, "a");
-    fprintf(fpij, "%5.2e %5.2e %5.2e %5.2e %10.6e \n", n1, n2, T1, T2, 0.0);
+    fprintf(fpij, "%5.2e %5.2e %5.2e %5.2e %10.6e\n", n1, n2, T1, T2, 0.0);
     fclose(fpij);
   }
 
