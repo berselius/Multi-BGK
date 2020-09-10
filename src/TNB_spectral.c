@@ -192,11 +192,13 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
   double *conv_weights = malloc(Nv * Nv * Nv * sizeof(double));
 
   // Check to see if the weight is generated
+  /*
   char weight_filename[256] = "Data/";
   char buffer[256];
   sprintf(buffer, "TNB_weight_");
   strcat(buffer, reaction_info->name);
   strcat(weight_filename, buffer);
+
 
   FILE *fidWeights;
   if ((fidWeights = fopen(weight_filename, "r"))) {
@@ -215,6 +217,9 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
       exit(0);
     }
   }
+  */
+
+  generate_conv_weights(conv_weights, reaction_info);
 
   // Weights are loaded, now compute the ffts of the functions
 
