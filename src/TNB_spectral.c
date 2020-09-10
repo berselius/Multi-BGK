@@ -128,12 +128,6 @@ void initializeTNB(int Nv_in, double *c_in, double *wts_in) {
     karr[i] = -Lk + i * dk;
   }
 
-  printf("Fourier modes\n");
-  for (int i = 0; i < Nv; i++) {
-    printf("i: %g\n", karr[i]);
-  }
-  printf("\n");
-
   // allocate bins for ffts
   fftIn_g = fftw_malloc(Nv * Nv * Nv * sizeof(fftw_complex));
   fftOut_g = fftw_malloc(Nv * Nv * Nv * sizeof(fftw_complex));
@@ -260,8 +254,6 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
     imag = fabs(f1[index] * temp_fftOut[index][1]);
     imagmax = imag > imagmax ? imag : imagmax;
   }
-
-  printf("Imagmax %g\n", imagmax);
 }
 
 double integrand(double r, void *args) {
