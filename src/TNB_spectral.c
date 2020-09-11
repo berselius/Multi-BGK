@@ -127,6 +127,7 @@ void initializeTNB(int Nv_in, double *c_in, double *wts_in) {
   for (int i = 0; i < Nv; i++) {
     karr[i] = -Lk + i * dk;
   }
+  printf("wt: %g, dv: %g\n", wts[Nv / 2], dv);
 
   // allocate bins for ffts
   fftIn_g = fftw_malloc(Nv * Nv * Nv * sizeof(fftw_complex));
@@ -145,11 +146,11 @@ double sigmavbar(double n, double T) {
   T = T * 1e-3;
 
   double denom = 1.0 - (T * (DDT.c2 + T * (DDT.c4 + T * DDT.c6))) /
-                           (1.0 + T * (DDT.c3 + T * (DDT.c5 + T * DDT.c6)));
+                           (1.0 + T * (DDT.c3 + T * (DDT.c5 + T * DDT.c7)));
   double theta = T / denom;
   double xi = pow(DDT.B_G * DDT.B_G / 4.0 / theta, 1.0 / 3.0);
 
-  return n * n * DDT.c1 * theta * sqrt(xi / T / T / T / 937814.) *
+  return 0.5 * n * n * DDT.c1 * theta * sqrt(xi / T / T / T / 937814.) *
          exp(-3.0 * xi);
 }
 
@@ -254,6 +255,8 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
     imag = fabs(f1[index] * temp_fftOut[index][1]);
     imagmax = imag > imagmax ? imag : imagmax;
   }
+
+  printf("Imagmax %g\n", imagmax);
 }
 
 double integrand(double r, void *args) {
@@ -295,7 +298,7 @@ void generate_conv_weights(double *conv_weights,
             sqrt(karr[i] * karr[i] + karr[j] * karr[j] + karr[k] * karr[k]);
         reaction_info->mabs = mabs;
         double result =
-            4.0 * M_PI * gauss_legendre(64, integrand, reaction_info, 0., Lv);
+            4.0 * M_PI * gauss_legendre(128, integrand, reaction_info, 0., Lv);
         conv_weights[k + Nv * (j + Nv * i)] = result;
       }
     }
