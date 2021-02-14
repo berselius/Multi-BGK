@@ -190,7 +190,7 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
   double imag;
   for (int index = 0; index < Nv * Nv * Nv; ++index) {
     Q_TNB[index] = f1[index] * temp_fftOut[index][0];
-    imag = fabs(f1[index] * temp_fftOut[index][1]);
+    imag = fabs(temp_fftOut[index][1]);
     imagmax = imag > imagmax ? imag : imagmax;
   }
 }
