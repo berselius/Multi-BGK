@@ -11,6 +11,7 @@ static int N;
 static int nX;
 static int ns;
 static int order;
+static int bc;
 static double Lx;
 static double h_v;
 static double dt;
@@ -35,13 +36,14 @@ double minmod(double in1, double in2, double in3) {
 
 void initialize_transport(int numV, int numX, int nspec, double *xnodes,
                           double *dxnodes, double Lx_val, double **vel, int ord,
-                          double timestep) {
+                          double timestep, int bcval) {
   N = numV;
   nX = numX; // Remember that this is nX in the rank
   x = xnodes;
   dx = dxnodes;
   ns = nspec;
   Lx = Lx_val;
+  bc = bcval;
 
   c = vel;
 
@@ -385,6 +387,140 @@ void fillGhostCellsPeriodic_secondorder(double ***f, int sp) {
   }
 }
 
+void fillGhostCellsPeriodic_firstorder(double ***f, int sp) {
+
+  int rank, numRanks;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
+  MPI_Status status;
+
+  int i;
+
+  int left_ghost = 0;
+  int left_actual = 1;
+  int right_actual = nX;
+  int right_ghost = nX + 1;
+  int up_nbr, down_nbr;
+
+  double xlocal[N * N * N];
+  double xremote[N * N * N];
+
+  // If just one rank, no MPI communication is needed
+  if (numRanks == 1) {
+    for (i = 0; i < N * N * N; i++) {
+      f[left_ghost][sp][i] = f[left_actual][sp][i];
+      f[right_ghost][sp][i] = f[right_actual][sp][i];
+    }
+  } else {
+
+    /* Processors 0 and 1 exchange, 2 and 3 exchange, etc.  Then
+       1 and 2 exchange, 3 and 4, etc.  The formula for this is
+       if (even) exchng up else down
+       if (odd)  exchng up else down
+    */
+    /* Note the use of xlocal[i] for &xlocal[i][0] */
+    /* An edge case is when there are an odd number of ranks - then the last
+     * (even) node is sending to 0, which is also an even node. */
+
+    up_nbr = rank + 1;
+    down_nbr = rank - 1;
+
+    if ((rank % 2) == 0) {
+
+      if (rank != numRanks - 1) {
+        for (i = 0; i < N * N * N; i++)
+          xlocal[i] = f[right_actual][sp][i];
+
+        /* exchange up */
+        MPI_Send(&xlocal[0], N * N * N, MPI_DOUBLE, up_nbr, 1, MPI_COMM_WORLD);
+
+        MPI_Recv(&xremote[0], N * N * N, MPI_DOUBLE, up_nbr, 2, MPI_COMM_WORLD,
+                 &status);
+
+        for (i = 0; i < N * N * N; i++)
+          f[right_ghost][sp][i] = xremote[i];
+      } else {
+        for (i = 0; i < N * N * N; i++)
+          f[right_ghost][sp][i] = f[right_actual][sp][i];
+      }
+    } else {
+
+      for (i = 0; i < N * N * N; i++)
+        xlocal[i] = f[left_actual][sp][i];
+
+      /* exchange down */
+      MPI_Recv(&xremote[0], N * N * N, MPI_DOUBLE, down_nbr, 1, MPI_COMM_WORLD,
+               &status);
+
+      MPI_Send(&xlocal[0], N * N * N, MPI_DOUBLE, down_nbr, 2, MPI_COMM_WORLD);
+
+      for (i = 0; i < N * N * N; i++)
+        f[left_ghost][sp][i] = xremote[i];
+    }
+
+    // Deal with edge case - boundary for odd numRanks case
+    if (numRanks % 2 == 1) {
+
+      if (rank == 0) {
+        for (i = 0; i < N * N * N; i++)
+          f[left_ghost][sp][i] = f[left_actual][sp][i];
+      } else if (rank == numRanks - 1) {
+
+        for (i = 0; i < N * N * N; i++)
+          f[right_ghost][sp][i] = f[right_actual][sp][i];
+      }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // Do the second set of exchanges
+    // In this case, there will always be an even rank to the right (because 0
+    // is even)
+    // However we could again have the case where rank 0 and numRanks-1 are both
+    // even. This is taken care of above.
+    if ((rank % 2) == 1) {
+
+      if (rank != numRanks - 1) {
+        for (i = 0; i < N * N * N; i++)
+          xlocal[i] = f[right_actual][sp][i];
+
+        /* exchange up */
+        MPI_Send(&xlocal[0], N * N * N, MPI_DOUBLE, up_nbr, 3, MPI_COMM_WORLD);
+
+        MPI_Recv(&xremote[0], N * N * N, MPI_DOUBLE, up_nbr, 4, MPI_COMM_WORLD,
+                 &status);
+
+        for (i = 0; i < N * N * N; i++)
+          f[right_ghost][sp][i] = xremote[i];
+      } else {
+        for (i = 0; i < N * N * N; i++)
+          f[right_ghost][sp][i] = f[right_actual][sp][i];
+      }
+
+    } else {
+
+      if (!((numRanks % 2 == 1) &&
+            (rank == 0))) { // this case was dealt with above
+        for (i = 0; i < N * N * N; i++)
+          xlocal[i] = f[left_actual][sp][i];
+
+        /* exchange down */
+        MPI_Recv(&xremote[0], N * N * N, MPI_DOUBLE, down_nbr, 3,
+                 MPI_COMM_WORLD, &status);
+
+        MPI_Send(&xlocal[0], N * N * N, MPI_DOUBLE, down_nbr, 4,
+                 MPI_COMM_WORLD);
+
+        for (i = 0; i < N * N * N; i++)
+          f[left_ghost][sp][i] = xremote[i];
+      }
+    }
+
+    // Ghost cells complete, just wait for all ranks to catch up
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
+}
+
 // Computes the x direction first order upwind solution FOR A SINGLE SPECIES
 void upwindOne_x(double ***f, double ***f_conv, double *v, int sp) {
   int i, j, k, l;
@@ -392,7 +528,10 @@ void upwindOne_x(double ***f, double ***f_conv, double *v, int sp) {
   double CFL_NUM;
 
   // Update ghost with current solution, prior to transport
-  fillGhostCellsPeriodic_firstorder(f, sp);
+  if (bc == 0)
+    fillGhostCellsPeriodic_firstorder(f, sp);
+  else if (bc == 1)
+    fillGhostCellsNeumann_firstorder(f, sp);
 
   // Note - the 'real' data lives in 1...Nx, the ghost points are 0 and Nx+1
 
@@ -417,7 +556,10 @@ void upwindOne_x(double ***f, double ***f_conv, double *v, int sp) {
   }
 
   // Get updated ghost solution
-  fillGhostCellsPeriodic_firstorder(f_conv, sp);
+  if (bc == 0)
+    fillGhostCellsPeriodic_firstorder(f_conv, sp);
+  else if (bc == 1)
+    fillGhostCellsNeumann_firstorder(f_conv, sp);
 }
 
 // Computes the v direction first order upwind solution FOR A SINGLE SPECIES
@@ -529,7 +671,12 @@ void upwindTwo_x(double ***f, double ***f_conv, double *v, int sp) {
   double slope[3];
   double CFL_NUM;
 
-  fillGhostCellsPeriodic_secondorder(f, sp);
+  if (bc == 0)
+    fillGhostCellsPeriodic_secondorder(f, sp);
+  else if (bc == 1) {
+    printf("Neumann bcs not implemented for second order\n");
+    exit(1);
+  }
 
   // main upwinding
   double f_l, f_r, f_ll, f_rr, x_l, x_r, x_ll, x_rr, dx_l, dx_r;
