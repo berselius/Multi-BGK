@@ -16,6 +16,7 @@ static int Nv;
 static double *c;
 static double *wts;
 static double Lv;
+static double *karr;
 
 static int first_DD = 1;
 static int first_DT = 1;
@@ -34,6 +35,8 @@ struct TNB_data {
   double b2;
   double b3;
   double b4;
+
+  double c1, c2, c3, c4, c5, c6, c7;
 
   double B_G;
 
@@ -71,7 +74,7 @@ void initializeTNB(int Nv_in, double *c_in, double *wts_in) {
   DT.b4 = 1.728e-4;
   DT.B_G = 34.33827;
 
-  DT.mu_reaction = 2.0053e-24;
+  DT.mu_reaction = 1.9969e-24;
 
   strcpy(DT.name, "DT");
 
@@ -87,7 +90,7 @@ void initializeTNB(int Nv_in, double *c_in, double *wts_in) {
   DDHE.b4 = 0.0;
   DDHE.B_G = 31.3970;
 
-  DDHE.mu_reaction = 1.672e-14;
+  DDHE.mu_reaction = 1.6605e-24;
 
   strcpy(DDHE.name, "DD_He3");
 
@@ -101,11 +104,30 @@ void initializeTNB(int Nv_in, double *c_in, double *wts_in) {
   DDT.b2 = 0.0;
   DDT.b3 = 0.0;
   DDT.b4 = 0.0;
+  DDT.c1 = 5.65718e-12;
+  DDT.c2 = 3.41267e-3;
+  DDT.c3 = 1.99167e-3;
+  DDT.c4 = 0.0;
+  DDT.c5 = 1.05060e-5;
+  DDT.c6 = 0;
+  DDT.c7 = 0;
+
   DDT.B_G = 31.3970;
 
-  DDT.mu_reaction = 1.672e-14;
+  DDT.mu_reaction = 1.6605e-24;
 
   strcpy(DDT.name, "DD_T");
+
+  karr = (double *)malloc(Nv * sizeof(double));
+
+  double dv = c[1] - c[0];
+  Lv = -c[0];
+  double dk = 2 * M_PI * Nv / dv;
+  double Lk = 0.5 * (Nv - 1) * dk;
+  for (int i = 0; i < Nv; i++) {
+    karr[i] = -Lk + i * dk;
+  }
+  printf("wt: %g, dv: %g\n", wts[Nv / 2], dv);
 
   // allocate bins for ffts
   fftIn_g = fftw_malloc(Nv * Nv * Nv * sizeof(fftw_complex));
@@ -118,6 +140,36 @@ void initializeTNB(int Nv_in, double *c_in, double *wts_in) {
 // forward declaration
 void generate_conv_weights(double *conv_weights,
                            struct TNB_data *reaction_info);
+
+// Equilibrium with T in keV
+double sigmavbar(double n, double T) {
+  T = T * 1e-3;
+
+  double denom = 1.0 - (T * (DDT.c2 + T * (DDT.c4 + T * DDT.c6))) /
+                           (1.0 + T * (DDT.c3 + T * (DDT.c5 + T * DDT.c7)));
+  double theta = T / denom;
+  double xi = pow(DDT.B_G * DDT.B_G / 4.0 / theta, 1.0 / 3.0);
+
+  return 0.5 * n * n * DDT.c1 * theta * sqrt(xi / T / T / T / 937814.) *
+         exp(-3.0 * xi);
+}
+
+void checkNanFFT(fftw_complex *in) {
+
+  for (int i = 0; i < Nv; ++i) {
+    for (int j = 0; j < Nv; ++j) {
+      for (int k = 0; k < Nv; ++k) {
+        if (isnan(in[k + Nv * (j + Nv * i)][0])) {
+          printf("nan at %d %d %d, real\n", i, j, k);
+          exit(37);
+        } else if (isnan(in[k + Nv * (j + Nv * i)][1])) {
+          printf("nan at %d %d %d, imag\n", i, j, k);
+          exit(37);
+        }
+      }
+    }
+  }
+}
 
 // Generic TNB calculator
 // This takes input data for the various flavors of TNB reactions
@@ -135,16 +187,16 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
   double *conv_weights = malloc(Nv * Nv * Nv * sizeof(double));
 
   // Check to see if the weight is generated
+  /*
   char weight_filename[256] = "Data/";
   char buffer[256];
   sprintf(buffer, "TNB_weight_");
   strcat(buffer, reaction_info->name);
   strcat(weight_filename, buffer);
 
+
   FILE *fidWeights;
   if ((fidWeights = fopen(weight_filename, "r"))) {
-    printf("Loading weights from %s\n", weight_filename);
-    fflush(stdout);
     fread(conv_weights, sizeof(double), Nv * Nv * Nv, fidWeights);
   } else {
     printf("Weights for %s not found, generating and storing in %s\n",
@@ -155,14 +207,18 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
 
     fidWeights = fopen(weight_filename, "w");
     fwrite(conv_weights, sizeof(double), Nv * Nv * Nv, fidWeights);
-    printf("Weights stored for %s\n", reaction_info->name);
     if (fflush(fidWeights) != 0) {
       printf("Something is wrong with storing the weights");
       exit(0);
     }
   }
+  */
+
+  generate_conv_weights(conv_weights, reaction_info);
 
   // Weights are loaded, now compute the ffts of the functions
+
+  initialize_fourier(Nv, c);
 
   // Fill fft data structions
   for (int index = 0; index < Nv * Nv * Nv; ++index) {
@@ -171,7 +227,9 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
   }
 
   // move to fourier space - N^3 log N
-  fft3D(fftIn_g, fftOut_g, 0);
+  fft3D(fftIn_g, fftOut_g, 1);
+
+  checkNanFFT(fftOut_g);
 
   // Find inverse of W(m) ghat(m)
   // note W(m) is a real function
@@ -181,7 +239,11 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
     temp_fftIn[index][1] = fftOut_g[index][1] * conv_weights[index];
   }
 
-  fft3D(temp_fftIn, temp_fftOut, 1); // N^3 log N
+  checkNanFFT(temp_fftIn);
+
+  fft3D(temp_fftIn, temp_fftOut, -1); // N^3 log N
+
+  checkNanFFT(temp_fftOut);
 
   // Take product in real space
   // Just return the real part, but check on the imag
@@ -193,6 +255,8 @@ void TNB_generic(struct TNB_data *reaction_info, double *f1, double *f2,
     imag = fabs(temp_fftOut[index][1]);
     imagmax = imag > imagmax ? imag : imagmax;
   }
+
+  printf("Imagmax %g\n", imagmax);
 }
 
 double integrand(double r, void *args) {
@@ -215,6 +279,8 @@ double integrand(double r, void *args) {
                                    exp(-data->B_G / sqrt(E_COM)) / E_COM
                              : 0;
 
+  xsec *= 1e-27; // convert from millbarns to cm^2
+
   double sincval =
       (r * data->mabs < 1.0e-6) ? 1.0 : sin(r * data->mabs) / (r * data->mabs);
 
@@ -228,7 +294,11 @@ void generate_conv_weights(double *conv_weights,
     for (int j = 0; j < Nv; ++j) {
       for (int k = 0; k < Nv; ++k) {
         // add gauss legendre
-        double result = gauss_legendre(64, integrand, reaction_info, 0, Lv);
+        double mabs =
+            sqrt(karr[i] * karr[i] + karr[j] * karr[j] + karr[k] * karr[k]);
+        reaction_info->mabs = mabs;
+        double result =
+            4.0 * M_PI * gauss_legendre(128, integrand, reaction_info, 0., Lv);
         conv_weights[k + Nv * (j + Nv * i)] = result;
       }
     }
@@ -241,7 +311,7 @@ double GetReactivity(double *Q_TNB) {
   int i, j, k;
 
   double react = 0;
-#pragma omp parallel for private(i, j, k) reduction(+ : react)
+  //#pragma omp parallel for private(i, j, k) reduction(+ : react)
   for (i = 0; i < Nv; i++) {
     for (j = 0; j < Nv; j++) {
       for (k = 0; k < Nv; k++) {
@@ -257,7 +327,7 @@ double GetReactivity(double *Q_TNB) {
 void GetTNB_dt(double mu, double *in_D, double *in_T, double *Q_DT) {
 
   // Check that we have the right reaction
-  if (abs(mu - DT.mu_reaction) / DT.mu_reaction > 1e-3) {
+  if (fabs(mu - DT.mu_reaction) / DT.mu_reaction > 1e-3) {
     // this is not a DT reaction
     printf("Warning - this is not a DT reaction - given mu=%g, DT mu is %g\n",
            mu, DT.mu_reaction);
@@ -272,7 +342,7 @@ void GetTNB_dt(double mu, double *in_D, double *in_T, double *Q_DT) {
 // Q_TNB(c) = \int g sigma_{DDHe}(g) f(c) f(v_\ast) d \v_ast
 void GetTNB_dd_He(double mu, double *in, double *Q_DDHE) {
   // Check that we have the right reaction
-  if (abs(mu - DDHE.mu_reaction) / DDHE.mu_reaction > 1e-3) {
+  if (fabs(mu - DDHE.mu_reaction) / DDHE.mu_reaction > 1e-3) {
     // this is not a DT reaction
     printf("Warning - This is not a DD reaction - given mu=%g, DD mu is %g\n",
            mu, DDHE.mu_reaction);
@@ -287,7 +357,7 @@ void GetTNB_dd_He(double mu, double *in, double *Q_DDHE) {
 // Q_TNB(c) = \int g sigma_{DDT}(g) f(c) f(v_\ast) d \v_ast
 void GetTNB_dd_T(double mu, double *in, double *Q_DDT) {
   // Check that we have the right reaction
-  if (abs(mu - DDT.mu_reaction) / DDT.mu_reaction > 1e-3) {
+  if (fabs(mu - DDT.mu_reaction) / DDT.mu_reaction > 1e-3) {
     // this is not a DT reaction
     printf("Warning - this is not a DD reaction - given mu=%g, DD mu is %g\n",
            mu, DDT.mu_reaction);
@@ -338,8 +408,7 @@ void TNB_DD(double *f_D, double *fout_D, int rank, int TNB_FLAG, double dt,
         for (int vy = 0; vy < Nv; vy++)
           for (int vz = 0; vz < Nv; vz++) {
             int index = vz + Nv * (vy + Nv * vx);
-            fout_D[index] -=
-                f_D[index] * (Q_TNB_HE[index] + Q_TNB_T[index]) * dt;
+            fout_D[index] -= (Q_TNB_HE[index] + Q_TNB_T[index]) * dt;
           }
     }
 
@@ -349,7 +418,8 @@ void TNB_DD(double *f_D, double *fout_D, int rank, int TNB_FLAG, double dt,
     } else
       fpij = fopen(buffer, "a");
 
-    fprintf(fpij, "%5.2e %5.2e %10.6e %10.6e\n", n, T, He_react, T_react);
+    fprintf(fpij, "%5.2e %5.2e %10.6e %10.6e %10.6e\n", n, T, He_react, T_react,
+            sigmavbar(n, T));
     fclose(fpij);
   } else {
     if (first_DD) {
@@ -357,7 +427,7 @@ void TNB_DD(double *f_D, double *fout_D, int rank, int TNB_FLAG, double dt,
       first_DD = 0;
     } else
       fpij = fopen(buffer, "a");
-    fprintf(fpij, "%5.2e %5.2e %10.6e %10.6e\n", n, T, 0.0, 0.0);
+    fprintf(fpij, "%5.2e %5.2e %10.6e %10.6e %10.6e \n", n, T, 0.0, 0.0, 0.0);
     fclose(fpij);
   }
 
@@ -376,8 +446,6 @@ void TNB_DT(double *f_D, double *f_T, double *fout_D, double *fout_T, int rank,
   double *Q_TNB_D = malloc(Nv * Nv * Nv * sizeof(double));
   double *Q_TNB_T = malloc(Nv * Nv * Nv * sizeof(double));
 
-  printf("DT TNB n:%g %g T:%g %g\n", n1, n2, T1, T2);
-
   if ((n1 > EPS_COLL) && (n2 > EPS_COLL)) {
 
     // Calculate Q_TNB
@@ -393,8 +461,8 @@ void TNB_DT(double *f_D, double *f_T, double *fout_D, double *fout_T, int rank,
         for (int vy = 0; vy < Nv; vy++)
           for (int vz = 0; vz < Nv; vz++) {
             int index = vz + Nv * (vy + Nv * vx);
-            fout_D[index] -= f_D[index] * (Q_TNB_D[index]) * dt;
-            fout_T[index] -= f_T[index] * (Q_TNB_T[index]) * dt;
+            fout_D[index] -= Q_TNB_D[index] * dt;
+            fout_T[index] -= Q_TNB_T[index] * dt;
           }
     }
 
@@ -404,8 +472,7 @@ void TNB_DT(double *f_D, double *f_T, double *fout_D, double *fout_T, int rank,
     } else
       fpij = fopen(buffer, "a");
 
-    fprintf(fpij, "%5.2e %5.2e %5.2e %5.2e %10.6e \n", n1, n2, T1, T2,
-            DT_react);
+    fprintf(fpij, "%5.2e %5.2e %5.2e %5.2e %10.6e\n", n1, n2, T1, T2, DT_react);
     fclose(fpij);
   } else {
     if (first_DT) {
@@ -413,7 +480,7 @@ void TNB_DT(double *f_D, double *f_T, double *fout_D, double *fout_T, int rank,
       first_DT = 0;
     } else
       fpij = fopen(buffer, "a");
-    fprintf(fpij, "%5.2e %5.2e %5.2e %5.2e %10.6e \n", n1, n2, T1, T2, 0.0);
+    fprintf(fpij, "%5.2e %5.2e %5.2e %5.2e %10.6e\n", n1, n2, T1, T2, 0.0);
     fclose(fpij);
   }
 
