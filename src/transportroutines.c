@@ -387,7 +387,8 @@ void fillGhostCellsPeriodic_secondorder(double ***f, int sp) {
   }
 }
 
-void fillGhostCellsPeriodic_firstorder(double ***f, int sp) {
+// Neumann case
+void fillGhostCellsNeumann_firstorder(double ***f, int sp) {
 
   int rank, numRanks;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
