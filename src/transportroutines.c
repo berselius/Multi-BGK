@@ -500,8 +500,7 @@ void fillGhostCellsNeumann_firstorder(double ***f, int sp) {
 
     } else {
 
-      if (!((numRanks % 2 == 1) &&
-            (rank == 0))) { // this case was dealt with above
+      if (rank != 0) {
         for (i = 0; i < N * N * N; i++)
           xlocal[i] = f[left_actual][sp][i];
 
@@ -514,6 +513,9 @@ void fillGhostCellsNeumann_firstorder(double ***f, int sp) {
 
         for (i = 0; i < N * N * N; i++)
           f[left_ghost][sp][i] = xremote[i];
+      } else {
+        for (i = 0; i < N * N * N; i++)
+          f[left_ghost][sp][i] = f[left_actual][sp][i];
       }
     }
 
